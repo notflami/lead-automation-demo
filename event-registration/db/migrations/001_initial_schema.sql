@@ -1,0 +1,103 @@
+-- Event Registration Platform — initial schema
+-- Works on any PostgreSQL 13+ (Supabase, Neon, self-hosted).
+
+-- ---------------------------------------------------------------------------
+-- Event settings: exactly one row (id = 1), edited from the admin dashboard.
+-- ---------------------------------------------------------------------------
+create table if not exists event_settings (
+  id                          smallint primary key default 1 check (id = 1),
+  event_name                  text        not null,
+  tagline                     text        not null default '',
+  event_date                  date,
+  start_time                  time,
+  end_time                    time,
+  venue_name                  text        not null default '',
+  venue_address               text        not null default '',
+  venue_map_url               text        not null default '',
+  about_text                  text        not null default '',
+  expectations                text        not null default '',   -- one item per line
+  dress_code                  text        not null default '',
+  additional_info             text        not null default '',
+  max_capacity                integer     not null default 250 check (max_capacity between 1 and 100000),
+  max_guests_per_registration integer     not null default 8   check (max_guests_per_registration between 1 and 50),
+  low_capacity_threshold      integer     not null default 30  check (low_capacity_threshold >= 0),
+  registration_open           boolean     not null default true,
+  waitlist_enabled            boolean     not null default true,
+  contact_email               text        not null default '',
+  contact_phone               text        not null default '',
+  organizer_name              text        not null default '',
+  organizer_address           text        not null default '',
+  data_retention_days         integer     not null default 30 check (data_retention_days between 0 and 3650),
+  updated_at                  timestamptz not null default now()
+);
+
+insert into event_settings (
+  id, event_name, tagline, event_date, start_time, end_time,
+  venue_name, venue_address, about_text, expectations, dress_code, additional_info,
+  max_capacity, organizer_name
+) values (
+  1,
+  'Balkan Night',
+  'One long table. Many languages. Music until late.',
+  current_date + 21,
+  '19:00',
+  '02:00',
+  'Venue name (edit in admin)',
+  'Street 1, 10115 Berlin',
+  'An evening of Balkan music, food and dance, open to everyone. Bring your family, your friends and your appetite. Whether you grew up with these songs or are hearing them for the first time, you will feel at home.',
+  E'Live music and a DJ until late\nTraditional dishes and drinks from across the region\nKolo dancing: no experience needed\nA mix of generations, languages and backgrounds',
+  'Smart casual. Traditional dress is welcome.',
+  'Entry is free with a reservation. Please bring your registration number.',
+  250,
+  'Organizer name (edit in admin)'
+) on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- Registrations
+-- ---------------------------------------------------------------------------
+create sequence if not exists registration_number_seq start 1;
+
+create table if not exists registrations (
+  id                   uuid        primary key default gen_random_uuid(),
+  reference            text        not null unique
+                         default ('REG-' || lpad(nextval('registration_number_seq')::text, 6, '0')),
+  full_name            text        not null check (char_length(full_name) between 2 and 120),
+  phone                text        not null check (char_length(phone) between 6 and 20),  -- normalised E.164
+  email                text        check (email is null or char_length(email) <= 254),
+  guest_count          integer     not null check (guest_count between 1 and 50),
+  status               text        not null default 'confirmed'
+                         check (status in ('confirmed', 'waitlisted', 'checked_in', 'cancelled')),
+  locale               text        not null default 'en',
+  idempotency_key      uuid        unique,
+  privacy_accepted_at  timestamptz not null,
+  admin_note           text        not null default '',
+  created_at           timestamptz not null default now(),
+  updated_at           timestamptz not null default now(),
+  cancelled_at         timestamptz,
+  anonymized_at        timestamptz,
+  webhook_status       text        not null default 'pending'
+                         check (webhook_status in ('pending', 'sent', 'failed', 'skipped')),
+  webhook_attempts     integer     not null default 0,
+  webhook_last_error   text,
+  webhook_sent_at      timestamptz
+);
+
+-- One active reservation per phone number (cancelled / anonymised rows don't count).
+create unique index if not exists registrations_active_phone_uniq
+  on registrations (phone)
+  where status <> 'cancelled' and anonymized_at is null;
+
+create index if not exists registrations_created_at_idx on registrations (created_at desc);
+create index if not exists registrations_status_idx     on registrations (status);
+create index if not exists registrations_webhook_idx    on registrations (webhook_status)
+  where webhook_status in ('pending', 'failed');
+
+-- ---------------------------------------------------------------------------
+-- Rate limiting (stores only salted hashes of IP addresses; purged regularly)
+-- ---------------------------------------------------------------------------
+create table if not exists rate_limit_hits (
+  bucket     text        not null,
+  key_hash   text        not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists rate_limit_hits_lookup_idx on rate_limit_hits (bucket, key_hash, created_at);

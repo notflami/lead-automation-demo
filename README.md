@@ -1,5 +1,7 @@
 # lead-automation-demo
 mail+telegram automatization
+
+> **New:** [`event-registration/`](event-registration/) is an event registration website + organizer dashboard (Next.js + PostgreSQL) that sends every registration to n8n. See its [README](event-registration/README.md).
 # Lead Auto-Response & Notification System
 
 A lightweight automation built with n8n that solves a common problem for local service businesses: leads going unanswered while staff are busy, leading to lost customers.
