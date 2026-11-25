@@ -17,9 +17,9 @@ export async function GET(req: Request) {
   const rows = await listRegistrations({ q: url.searchParams.get("q") || "", status: url.searchParams.get("status") || "all" });
   const tz = process.env.EVENT_TIMEZONE || "Europe/Berlin";
   const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: tz, dateStyle: "short", timeStyle: "medium" });
-  const header = ["Registration ID", "Full name", "Phone", "Email", "Guests", "Status", "Registered at", "Note"];
+  const header = ["Registration ID", "Full name", "Phone", "Guests", "Status", "Registered at", "Note"];
   const lines = rows.map((r) =>
-    [r.reference, r.full_name, r.phone, r.email, r.guest_count, r.status, fmt.format(new Date(r.created_at)), r.admin_note]
+    [r.reference, r.full_name, r.phone, r.guest_count, r.status, fmt.format(new Date(r.created_at)), r.admin_note]
       .map(cell)
       .join(";"),
   );

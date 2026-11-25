@@ -14,7 +14,7 @@ export function SiteFooter({ s, t }: { s: EventSettings; t: Dict }) {
             </p>
           )}
         </div>
-        {(s.contact_email || s.contact_phone) && (
+        {(s.contact_email || s.contact_phone || s.whatsapp_number) && (
           <div>
             <h2 className="text-base font-semibold text-saffron">{t.contact}</h2>
             <ul className="mt-3 space-y-2 text-base">
@@ -22,6 +22,18 @@ export function SiteFooter({ s, t }: { s: EventSettings; t: Dict }) {
                 <li>
                   <a className="underline-offset-4 hover:underline" href={`tel:${s.contact_phone.replace(/[^\d+]/g, "")}`}>
                     {s.contact_phone}
+                  </a>
+                </li>
+              )}
+              {s.whatsapp_number && (
+                <li>
+                  <a
+                    className="underline-offset-4 hover:underline"
+                    href={`https://wa.me/${s.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(`Hallo! Ich habe eine Frage zur Veranstaltung „${s.event_name}“.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    WhatsApp
                   </a>
                 </li>
               )}

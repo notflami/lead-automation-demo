@@ -124,3 +124,8 @@ alter table event_settings  enable row level security;
 alter table registrations   enable row level security;
 alter table rate_limit_hits enable row level security;
 insert into schema_migrations (name) values ('003_enable_rls.sql') on conflict do nothing;
+
+-- ===== 004_whatsapp_number.sql =====
+-- Event contact number for the WhatsApp click-to-chat button (empty = button hidden).
+alter table event_settings add column if not exists whatsapp_number text not null default '';
+insert into schema_migrations (name) values ('004_whatsapp_number.sql') on conflict do nothing;

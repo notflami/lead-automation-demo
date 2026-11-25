@@ -25,7 +25,6 @@ export default async function PrivacyPage() {
           <h2>Welche Daten wir verarbeiten</h2>
           <ul>
             <li>Vor- und Nachname, Handynummer, Anzahl der Personen</li>
-            <li>E-Mail-Adresse, falls Sie sie freiwillig angeben</li>
             <li>Zeitpunkt der Reservierung und gewählte Sprache</li>
           </ul>
           <p>
@@ -52,7 +51,9 @@ export default async function PrivacyPage() {
           <h2>Cookies und externe Inhalte</h2>
           <p>
             Diese Website setzt keine Tracking- oder Werbe-Cookies. Es wird höchstens ein Cookie für die gewählte Sprache gespeichert. Schriftarten
-            werden von unserem eigenen Server geladen. Kartendienste werden erst geöffnet, wenn Sie auf „In Karten öffnen“ tippen.
+            werden von unserem eigenen Server geladen. Kartendienste werden erst geöffnet, wenn Sie auf „In Karten öffnen“ tippen. WhatsApp
+            (Meta) wird erst geöffnet, wenn Sie auf einen WhatsApp-Button tippen; was Sie uns dort schreiben, unterliegt den Bedingungen von
+            WhatsApp.
           </p>
           <h2>Ihre Rechte</h2>
           <p>
@@ -69,7 +70,6 @@ export default async function PrivacyPage() {
           <h2>What we store</h2>
           <ul>
             <li>First and last name, mobile number, number of people</li>
-            <li>Email address, only if you choose to give it</li>
             <li>The time of your reservation and the language you used</li>
           </ul>
           <p>
@@ -95,7 +95,8 @@ export default async function PrivacyPage() {
           <h2>Cookies and external content</h2>
           <p>
             This website uses no tracking or advertising cookies. At most, one cookie remembers your language. Fonts are served from our own
-            server. Map services open only when you tap “Open in maps”.
+            server. Map services open only when you tap “Open in maps”. WhatsApp (Meta) opens only when you tap a WhatsApp button; what
+            you write to us there is subject to WhatsApp’s terms.
           </p>
           <h2>Your rights</h2>
           <p>

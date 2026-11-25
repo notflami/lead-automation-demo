@@ -23,6 +23,7 @@ export interface EventSettings {
   waitlist_enabled: boolean;
   contact_email: string;
   contact_phone: string;
+  whatsapp_number: string;
   organizer_name: string;
   organizer_address: string;
   privacy_notes: string;

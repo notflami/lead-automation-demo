@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { STATUS_LABEL } from "@/components/admin/StatusBadge";
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { requireAdmin } from "@/lib/auth";
@@ -17,6 +18,7 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
 
   return (
     <div className="space-y-5">
+      <AutoRefresh seconds={30} />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="display mr-auto text-3xl text-ink">Registrations</h1>
         <a href={`/api/admin/export?${exportQs}`} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-ink px-4 text-sm font-semibold text-linen hover:bg-ink-soft">

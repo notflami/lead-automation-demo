@@ -127,6 +127,9 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         <Field label="Contact phone">
           <input name="contact_phone" defaultValue={v.contact_phone} maxLength={40} className={input} />
         </Field>
+        <Field label="WhatsApp number" hint="Optional. Guests can tap a button to message this number. Empty hides the button.">
+          <input name="whatsapp_number" type="tel" defaultValue={v.whatsapp_number} maxLength={40} className={input} placeholder="+49 176 1234567" />
+        </Field>
         <Field label="Keep personal data for (days after the event)" hint="Then names and phone numbers are erased automatically.">
           <input name="data_retention_days" type="number" min={0} max={3650} defaultValue={v.data_retention_days} required className={input} />
         </Field>

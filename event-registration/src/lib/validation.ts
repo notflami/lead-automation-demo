@@ -8,16 +8,13 @@ export type FieldErrorCode =
   | "name_required"
   | "name_invalid"
   | "phone_invalid"
-  | "email_invalid"
   | "guests_invalid"
   | "guests_too_many"
-  | "privacy_required"
   | "form_invalid";
 
 export interface RegistrationInput {
   fullName: string;
   phone: string; // normalised
-  email: string | null;
   guestCount: number;
   locale: "en" | "de";
   idempotencyKey: string;
@@ -25,7 +22,6 @@ export interface RegistrationInput {
 }
 
 const uuid = z.string().uuid();
-const emailSchema = z.string().email().max(254);
 
 /** Collapses whitespace and strips control characters. */
 export function cleanText(v: unknown, max = 500): string {
@@ -47,18 +43,9 @@ export function validateRegistration(
   const phone = normalizePhone(cleanText(body.phone, 40), opts.defaultCountryCode);
   if (!phone) errors.phone = "phone_invalid";
 
-  const emailRaw = cleanText(body.email, 254).toLowerCase();
-  let email: string | null = null;
-  if (emailRaw) {
-    if (emailSchema.safeParse(emailRaw).success) email = emailRaw;
-    else errors.email = "email_invalid";
-  }
-
   const guestCount = Number(body.guestCount);
   if (!Number.isInteger(guestCount) || guestCount < 1) errors.guestCount = "guests_invalid";
   else if (guestCount > Math.min(opts.maxGuests, MAX_GUESTS_HARD_LIMIT)) errors.guestCount = "guests_too_many";
-
-  if (body.privacyAccepted !== true) errors.privacyAccepted = "privacy_required";
 
   const idem = uuid.safeParse(body.idempotencyKey);
 
@@ -71,7 +58,6 @@ export function validateRegistration(
     data: {
       fullName,
       phone: phone!,
-      email,
       guestCount,
       locale: body.locale === "de" ? "de" : "en",
       idempotencyKey: idem.data!,
@@ -113,6 +99,7 @@ export const settingsSchema = z.object({
   waitlist_enabled: z.boolean(),
   contact_email: z.union([z.literal(""), z.string().trim().email().max(254)]),
   contact_phone: optionalText(40),
+  whatsapp_number: optionalText(40),
   organizer_name: optionalText(200),
   organizer_address: optionalText(500),
   privacy_notes: optionalText(4000),

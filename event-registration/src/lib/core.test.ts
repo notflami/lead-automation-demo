@@ -49,19 +49,17 @@ describe("validateRegistration", () => {
   const good = {
     fullName: "  Ana   Petrović ",
     phone: "0176 1234567",
-    email: "",
     guestCount: 3,
-    privacyAccepted: true,
     idempotencyKey: "6f1c1a8e-7f0e-4b8e-9a4f-2d1c3b4a5e6f",
     locale: "de",
   };
   it("accepts and normalises valid input", () => {
     const r = validateRegistration(good, opts);
-    expect(r.ok && r.data).toMatchObject({ fullName: "Ana Petrović", phone: "+491761234567", email: null, guestCount: 3, locale: "de" });
+    expect(r.ok && r.data).toMatchObject({ fullName: "Ana Petrović", phone: "+491761234567", guestCount: 3, locale: "de" });
   });
-  it("requires privacy acknowledgement", () => {
-    const r = validateRegistration({ ...good, privacyAccepted: false }, opts);
-    expect(!r.ok && r.errors.privacyAccepted).toBe("privacy_required");
+  it("needs only name, phone and guest count", () => {
+    const { fullName, phone, guestCount, idempotencyKey } = good;
+    expect(validateRegistration({ fullName, phone, guestCount, idempotencyKey }, opts).ok).toBe(true);
   });
   it("enforces max guests per registration", () => {
     const r = validateRegistration({ ...good, guestCount: 9 }, opts);
@@ -74,9 +72,5 @@ describe("validateRegistration", () => {
   it("rejects fractional / string guest counts", () => {
     expect(validateRegistration({ ...good, guestCount: 2.5 }, opts).ok).toBe(false);
     expect(validateRegistration({ ...good, guestCount: "x" }, opts).ok).toBe(false);
-  });
-  it("rejects a bad email but allows empty", () => {
-    const r = validateRegistration({ ...good, email: "not-an-email" }, opts);
-    expect(!r.ok && r.errors.email).toBe("email_invalid");
   });
 });

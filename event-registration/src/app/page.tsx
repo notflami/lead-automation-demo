@@ -2,7 +2,6 @@ import { Embroidery, StitchDiamond } from "@/components/Embroidery";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { RegistrationForm, type FormMode } from "@/components/RegistrationForm";
 import { SiteFooter } from "@/components/SiteFooter";
-import { StickyCta } from "@/components/StickyCta";
 import { env } from "@/lib/env";
 import { formatDayMonth, formatEventDate, formatTimeRange, splitLines } from "@/lib/format";
 import { issueFormToken } from "@/lib/form-token";
@@ -23,7 +22,6 @@ export default async function HomePage() {
   const expectations = splitLines(s.expectations);
   const aboutParagraphs = s.about_text.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
   const showScarcity = mode === "open" && s.low_capacity_threshold > 0 && remaining <= s.low_capacity_threshold;
-  const ctaLabel = mode === "waitlist" ? t.joinWaitlistCta : t.reserveCta;
   const canAct = mode === "open" || mode === "waitlist";
   const year = s.event_date?.slice(0, 4);
 
@@ -33,66 +31,91 @@ export default async function HomePage() {
         {t.skipToForm}
       </a>
 
-      {/* ------------------------------------------------------------------ hero */}
+      {/* ------------------------------------------- hero + reservation form (first screen) */}
       <header className="relative bg-ink text-linen">
-        <div className="mx-auto max-w-6xl px-5 pt-5 pb-14 sm:px-8 md:pb-20">
+        <div className="mx-auto max-w-6xl px-5 pt-4 pb-10 sm:px-8 md:pb-16">
           <div className="flex justify-end">
             <LanguageSwitch locale={locale} label={t.switchTo} className="text-linen/90" />
           </div>
 
-          <div className="mt-8 grid gap-10 md:mt-14 md:grid-cols-12 md:gap-8">
-            <div className="md:col-span-8">
+          <div className="mt-2 grid items-start gap-6 md:mt-8 md:grid-cols-12 md:gap-10">
+            <div className="md:col-span-6 lg:col-span-7">
               {dm && (
                 <p className="text-lg font-medium text-saffron md:hidden">
                   {dateText}
                   {s.start_time && <span className="text-linen/80">, {timeText}</span>}
                 </p>
               )}
-              <h1 className="display mt-3 text-[clamp(3.2rem,13vw,7.5rem)] text-balance text-linen md:mt-0">{s.event_name}</h1>
-              {s.tagline && <p className="mt-5 max-w-xl text-xl leading-snug text-linen/85 sm:text-2xl">{s.tagline}</p>}
+              <h1 className="display mt-2 text-[clamp(2.6rem,11vw,6.5rem)] text-balance text-linen md:mt-0">{s.event_name}</h1>
+              {s.tagline && <p className="mt-3 max-w-xl text-lg leading-snug text-linen/85 sm:text-2xl md:mt-5">{s.tagline}</p>}
               {s.venue_name && (
-                <p className="mt-5 flex items-start gap-2 text-lg text-linen/80 md:hidden">
+                <p className="mt-3 flex items-start gap-2 text-base text-linen/80 md:hidden">
                   <PinIcon />
                   <span>
                     {s.venue_name}
-                    {s.venue_address && <span className="block text-linen/60">{s.venue_address}</span>}
+                    {s.venue_address && <span className="text-linen/60">, {s.venue_address}</span>}
                   </span>
                 </p>
               )}
-              <div id="hero-cta" className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-6">
-                {canAct ? (
-                  <a href="#reserve" className="btn-primary w-full px-9 text-xl sm:w-auto">
-                    {ctaLabel}
-                  </a>
-                ) : (
-                  <p className="rounded-full border border-linen/30 px-6 py-3 text-lg">
-                    {mode === "closed" ? t.closedHeading : t.fullBanner}
-                  </p>
-                )}
-                {showScarcity && <p className="text-lg font-medium text-saffron-light">{t.placesLeft(remaining)}</p>}
-              </div>
+              {showScarcity && <p className="mt-3 text-lg font-medium text-saffron-light">{t.placesLeft(remaining)}</p>}
+
+              {/* Desktop date composition: the day numeral as the anchor. */}
+              {dm && (
+                <div className="mt-10 hidden border-t border-linen/15 pt-8 md:block">
+                  <div className="flex items-end gap-5">
+                    <p className="display text-[7.5rem] leading-[0.85] text-saffron tabular-nums">{dm.day}</p>
+                    <div className="pb-1">
+                      <p className="text-lg text-linen/70">{dm.weekday}</p>
+                      <p className="display text-4xl text-linen">
+                        {dm.month} <span className="text-linen/50">{year}</span>
+                      </p>
+                    </div>
+                  </div>
+                  {timeText && <p className="mt-6 text-xl text-linen/90">{timeText}</p>}
+                  {s.venue_name && (
+                    <p className="mt-3 flex items-start gap-2 text-lg text-linen/80">
+                      <PinIcon />
+                      <span>
+                        {s.venue_name}
+                        {s.venue_address && <span className="block text-linen/60">{s.venue_address}</span>}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Desktop date composition: the day numeral as the anchor. */}
-            {dm && (
-              <div className="hidden md:col-span-4 md:block md:border-l md:border-linen/15 md:pl-8">
-                <p className="text-lg text-linen/70">{dm.weekday}</p>
-                <p className="display text-[9.5rem] leading-[0.85] text-saffron tabular-nums">{dm.day}</p>
-                <p className="display mt-2 text-4xl text-linen">
-                  {dm.month} <span className="text-linen/50">{year}</span>
-                </p>
-                {timeText && <p className="mt-6 text-xl text-linen/90">{timeText}</p>}
-                {s.venue_name && (
-                  <p className="mt-4 flex items-start gap-2 text-lg text-linen/80">
-                    <PinIcon />
-                    <span>
-                      {s.venue_name}
-                      {s.venue_address && <span className="block text-linen/60">{s.venue_address}</span>}
-                    </span>
-                  </p>
-                )}
-              </div>
-            )}
+            <section
+              id="reserve"
+              aria-labelledby={canAct ? "reserve-h" : undefined}
+              aria-label={canAct ? undefined : t.formHeading}
+              className="scroll-mt-4 rounded-3xl bg-white p-5 text-ink shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)] sm:p-8 md:col-span-6 lg:col-span-5"
+            >
+              {canAct && (
+                <>
+                  <h2 id="reserve-h" className="display text-[1.65rem] leading-tight sm:text-3xl">
+                    {mode === "waitlist" ? t.joinWaitlistCta : t.formHeading}
+                  </h2>
+                  <p className="mt-1 mb-5 text-base text-muted">{mode === "waitlist" ? t.formIntroWaitlist : t.formIntro}</p>
+                </>
+              )}
+              <RegistrationForm
+                locale={locale}
+                mode={mode}
+                maxGuests={s.max_guests_per_registration}
+                formToken={formToken}
+                siteUrl={env.siteUrl()}
+                whatsappNumber={s.whatsapp_number}
+                event={{
+                  name: s.event_name,
+                  dateText,
+                  dateTextDe: formatEventDate(s.event_date, "de"),
+                  timeText,
+                  venueName: s.venue_name,
+                  venueAddress: s.venue_address,
+                }}
+              />
+            </section>
           </div>
         </div>
       </header>
@@ -167,40 +190,9 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {/* ------------------------------------------------------ registration */}
-        <section id="reserve" aria-labelledby="reserve-h" className="scroll-mt-4 bg-ink text-linen">
-          <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-12 md:py-20">
-            <div className="md:col-span-5">
-              <h2 id="reserve-h" className="display text-4xl text-balance md:text-6xl">
-                {mode === "waitlist" ? t.joinWaitlistCta : t.formHeading}
-              </h2>
-              {canAct && (
-                <p className="mt-4 max-w-md text-xl text-linen/80">{mode === "waitlist" ? t.formIntroWaitlist : t.formIntro}</p>
-              )}
-              {showScarcity && <p className="mt-4 text-lg font-medium text-saffron-light">{t.placesLeft(remaining)}</p>}
-            </div>
-            <div className="rounded-3xl bg-white p-6 text-ink shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)] sm:p-9 md:col-span-7">
-              <RegistrationForm
-                locale={locale}
-                mode={mode}
-                maxGuests={s.max_guests_per_registration}
-                formToken={formToken}
-                siteUrl={env.siteUrl()}
-                event={{
-                  name: s.event_name,
-                  dateText,
-                  timeText,
-                  venueName: s.venue_name,
-                  venueAddress: s.venue_address,
-                }}
-              />
-            </div>
-          </div>
-        </section>
       </main>
 
       <SiteFooter s={s} t={t} />
-      {canAct && <StickyCta label={ctaLabel} />}
     </>
   );
 }

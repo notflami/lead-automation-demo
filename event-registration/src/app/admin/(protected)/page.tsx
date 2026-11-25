@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/admin/AutoRefresh";
 import { retryWebhooksAction } from "@/app/admin/actions";
 import { ActionButton } from "@/components/admin/ActionButton";
 import { ActivityChart } from "@/components/admin/ActivityChart";
@@ -32,6 +33,7 @@ export default async function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh seconds={30} />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="display mr-auto text-3xl text-ink">Overview</h1>
         <span

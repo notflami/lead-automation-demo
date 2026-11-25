@@ -59,11 +59,12 @@ export async function createRegistration(input: RegistrationInput): Promise<Crea
     if (!decision.ok) return decision;
 
     const [registration] = await tx.unsafe<Registration[]>(
+      // privacy_accepted_at = when the guest submitted the form with the privacy notice shown above the button.
       `insert into registrations
-         (full_name, phone, email, guest_count, status, locale, idempotency_key, privacy_accepted_at)
-       values ($1, $2, $3, $4, $5, $6, $7, now())
+         (full_name, phone, guest_count, status, locale, idempotency_key, privacy_accepted_at)
+       values ($1, $2, $3, $4, $5, $6, now())
        returning ${REG_COLUMNS}`,
-      [input.fullName, input.phone, input.email, input.guestCount, decision.status, input.locale, input.idempotencyKey],
+      [input.fullName, input.phone, input.guestCount, decision.status, input.locale, input.idempotencyKey],
     );
     return { ok: true, registration, duplicate: false } as const;
   });

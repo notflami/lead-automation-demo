@@ -116,7 +116,9 @@ In the dashboard (`<your link>/admin`) → **Event settings**:
 2. **Event:** name, short line under the name, date, start/end time, venue name and address, map link
    (optional: open the venue in Google Maps → **Share** → **Copy link**).
 3. **Page texts:** "About the evening", "What to expect" (one item per line), dress code, "Good to know".
-4. **Organizer and legal:** see the [legal checklist](#part-6-legal-details-you-must-provide) below.
+4. **Organizer and legal:** optional **WhatsApp number**: guests then see a "Questions? Write to us
+   on WhatsApp" button that opens a chat with this number and a pre-filled German message (free
+   wa.me link; leave empty to hide it). For the legal fields see the [legal checklist](#part-6-legal-details-you-must-provide) below.
 5. Click **Save settings**, then open your link on your phone to check everything.
 
 All of this can be changed at any time without touching code.
@@ -131,34 +133,28 @@ needs a public address). An n8n that only runs on your own computer cannot recei
 1. **Download the workflow:** on GitHub open `event-registration/n8n/new-registration-workflow.json`
    → click **Download raw file** (arrow-down icon, top right of the file).
 2. **Import it:** in n8n create a new, empty workflow → open the **⋯** menu (top right) →
-   **Import from File** → choose the downloaded file. You see four boxes (nodes):
+   **Import from File** → choose the downloaded file. You see two boxes (nodes):
    - **New registration**: receives each registration from the website
    - **Notify organizers (Telegram)**: sends you a Telegram message
-   - **Guest left an email?**: checks whether the guest typed an email
-   - **Send confirmation (Gmail)**: emails the guest their registration number (EN or DE)
 3. **Protect the webhook:** double-click **New registration** → **Authentication** shows
    **Header Auth** → **Credential for Header Auth** → **Create new credential**:
    - **Name:** `X-Webhook-Secret` (exactly like this)
    - **Value:** your `N8N_WEBHOOK_SECRET` from Part 0.2
    - **Save**.
-4. **Telegram** (skip if you don't want Telegram messages, then delete that node):
+4. **Telegram:**
    1. In Telegram open **@BotFather** → send `/newbot` → follow the questions → copy the **token**.
    2. Send any message to your new bot (or add it to your organizer group and write a message there).
    3. In a browser open `https://api.telegram.org/bot<TOKEN>/getUpdates` (replace `<TOKEN>`). Find
       `"chat":{"id": ... }`. That number (may start with `-` for groups) is your **Chat ID**.
    4. In n8n double-click **Notify organizers (Telegram)** → **Credential** → create new → paste the
       token → **Save**. Replace `REPLACE_WITH_YOUR_CHAT_ID` with your Chat ID.
-5. **Gmail** (skip if you don't want confirmation emails, then delete the two right-hand nodes):
-   double-click **Send confirmation (Gmail)** → **Credential** → choose your existing Gmail
-   credential (the one your "Google Sheets → Thank-You Email" workflow uses) or create one with
-   **Sign in with Google**.
-6. **Copy the address:** double-click **New registration** → click **Production URL** (not "Test URL")
+5. **Copy the address:** double-click **New registration** → click **Production URL** (not "Test URL")
    → copy the address (ends in `/webhook/new-registration`). This is your **`N8N_WEBHOOK_URL`**.
-7. **Save** the workflow (top right) and switch it on: click **Publish** (newer n8n) or turn the
+6. **Save** the workflow (top right) and switch it on: click **Publish** (newer n8n) or turn the
    **Active** switch on (older n8n).
-8. **In Vercel:** **Settings** → **Environment Variables** → add `N8N_WEBHOOK_URL` and
+7. **In Vercel:** **Settings** → **Environment Variables** → add `N8N_WEBHOOK_URL` and
    `N8N_WEBHOOK_SECRET` (if not added in Part 2) → **Redeploy** (Part 2, step 7).
-9. **Test:** make a reservation on your website. Within seconds you get the Telegram message. In the
+8. **Test:** make a reservation on your website. Within seconds you get the Telegram message. In the
    dashboard **Overview** → **n8n automation** shows **1 delivered**.
 
 **If it shows "failed":** open the registration in the dashboard; under **Sent to n8n** you see the
@@ -187,7 +183,8 @@ On your **phone**, using mobile data (not Wi-Fi):
       (button at the top right).
 - [ ] Make a reservation for 2 people. You see "You're on the list" and a number like `REG-000001`.
 - [ ] Tap **Add to calendar**. The event appears with the right time.
-- [ ] Telegram / email arrived (if you set up n8n).
+- [ ] The Telegram message arrived (if you set up n8n).
+- [ ] If you set a WhatsApp number: tap "Questions? Write to us on WhatsApp". WhatsApp opens with your number and a German message.
 - [ ] Footer → **Privacy** and **Imprint** show your organizer details.
 - [ ] In the dashboard: the reservation is listed, **Overview** shows 2 reserved places.
 - [ ] Cancel the test reservation in the dashboard (open it → **Cancel registration**). Places go back.
@@ -218,15 +215,14 @@ use. Suggested text (edit names to match your setup):
 
 > Hosting: Vercel Inc., USA (servers in Frankfurt). Vercel processes technical access data (e.g. IP
 > address) in server logs. Database: Supabase Inc., USA (servers in Frankfurt). Notifications: our
-> n8n automation forwards new registrations to Telegram (Telegram Messenger Inc.) and sends
-> confirmation emails via Gmail (Google Ireland Ltd.). Data processing agreements under Art. 28 GDPR
-> are in place with these providers. Transfers to the USA are based on the EU–US Data Privacy
+> n8n automation forwards new registrations to the organizers via Telegram (Telegram Messenger Inc.).
+> Data processing agreements under Art. 28 GDPR are in place with these providers. Transfers to the USA are based on the EU–US Data Privacy
 > Framework or Standard Contractual Clauses.
 >
 > Hosting: Vercel Inc., USA (Server in Frankfurt). Vercel verarbeitet technische Zugriffsdaten (z. B.
 > IP-Adresse) in Server-Logs. Datenbank: Supabase Inc., USA (Server in Frankfurt). Benachrichtigungen:
-> Unsere n8n-Automatisierung leitet neue Reservierungen an Telegram (Telegram Messenger Inc.) weiter
-> und versendet Bestätigungen per Gmail (Google Ireland Ltd.). Mit diesen Anbietern bestehen
+> Unsere n8n-Automatisierung leitet neue Reservierungen per Telegram (Telegram Messenger Inc.) an die
+> Veranstalter weiter. Mit diesen Anbietern bestehen
 > Auftragsverarbeitungsverträge nach Art. 28 DSGVO. Übermittlungen in die USA erfolgen auf Grundlage
 > des EU-US Data Privacy Framework bzw. von Standardvertragsklauseln.
 
@@ -234,8 +230,7 @@ Before using this text, check each provider's current privacy/DPA page and adjus
 mechanisms to what they state. Remove services you don't use.
 
 **Also do this:**
-- [ ] Conclude the **Data Processing Agreement (DPA / AVV)** with Vercel and with Supabase (and Google /
-      your n8n host if they process guest data). Each provider publishes it on its legal pages; search
+- [ ] Conclude the **Data Processing Agreement (DPA / AVV)** with Vercel and with Supabase (and your n8n host if they process guest data). Each provider publishes it on its legal pages; search
       "<provider> DPA". Keep a copy.
 - [ ] Keep **data retention** short (Event settings, default 30 days after the event). After that,
       names, phone numbers and emails are erased automatically; only anonymous totals remain.

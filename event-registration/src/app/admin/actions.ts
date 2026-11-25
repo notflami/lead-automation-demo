@@ -93,8 +93,15 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     return { error: `Check the field "${String(i?.path[0]).replace(/_/g, " ")}": ${i?.message}` };
   }
   const s = parsed.data;
+  let whatsapp = "";
+  if (s.whatsapp_number) {
+    const n = normalizePhone(s.whatsapp_number, env.defaultCountryCode());
+    if (!n) return { error: 'Check the field "WhatsApp number": use a mobile number like +49 176 1234567.' };
+    whatsapp = n;
+  }
   const values = {
     ...s,
+    whatsapp_number: whatsapp,
     event_date: s.event_date || null,
     start_time: s.start_time || null,
     end_time: s.end_time || null,

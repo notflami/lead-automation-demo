@@ -9,6 +9,8 @@ export type FormMode = "open" | "waitlist" | "full" | "closed";
 export interface EventSummary {
   name: string;
   dateText: string;
+  /** German date for the pre-filled WhatsApp message. */
+  dateTextDe: string;
   timeText: string;
   venueName: string;
   venueAddress: string;
@@ -23,7 +25,7 @@ interface Confirmation {
 }
 
 const STORAGE_KEY = "reservation:v1";
-type FieldName = "fullName" | "phone" | "email" | "guestCount" | "privacyAccepted";
+type FieldName = "fullName" | "phone" | "guestCount";
 
 function newKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -51,14 +53,14 @@ export function RegistrationForm(props: {
   formToken: string;
   event: EventSummary;
   siteUrl: string;
+  /** Event WhatsApp number (E.164) or "" when not set. */
+  whatsappNumber: string;
 }) {
   const t = dictionaries[props.locale];
   const id = useId();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [guests, setGuests] = useState(1);
-  const [privacy, setPrivacy] = useState(false);
   const [website, setWebsite] = useState(""); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -93,8 +95,6 @@ export function RegistrationForm(props: {
     const e: Partial<Record<FieldName, string>> = {};
     if (!fullName.trim()) e.fullName = t.errors.name_required;
     if (phone.replace(/\D/g, "").length < 6) e.phone = t.errors.phone_invalid;
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = t.errors.email_invalid;
-    if (!privacy) e.privacyAccepted = t.errors.privacy_required;
     return e;
   }
 
@@ -107,9 +107,7 @@ export function RegistrationForm(props: {
         body: JSON.stringify({
           fullName,
           phone,
-          email,
           guestCount: guests,
-          privacyAccepted: privacy,
           idempotencyKey: keyRef.current,
           locale: props.locale,
           acceptWaitlist,
@@ -154,7 +152,7 @@ export function RegistrationForm(props: {
           else mapped[k as FieldName] = fieldMessage(code);
         }
         setErrors(mapped);
-        if (!mapped.fullName && !mapped.phone && !mapped.email && !mapped.guestCount && !mapped.privacyAccepted) break;
+        if (!mapped.fullName && !mapped.phone && !mapped.guestCount) break;
         setFormError(t.errorSummary);
         break;
       }
@@ -213,9 +211,7 @@ export function RegistrationForm(props: {
     setConfirmation(null);
     setFullName("");
     setPhone("");
-    setEmail("");
     setGuests(1);
-    setPrivacy(false);
     setErrors({});
     setFormError(null);
   }
@@ -281,6 +277,13 @@ export function RegistrationForm(props: {
           >
             {t.shareWhatsApp}
           </a>
+        </div>
+        <div className="mt-4">
+          <WhatsAppLink
+            number={props.whatsappNumber}
+            label={t.whatsappReservation}
+            message={`Hallo! Meine Reservierungsnummer ist ${confirmation.reference}. Ich habe eine Frage zur Veranstaltung „${props.event.name}“.`}
+          />
         </div>
         <button type="button" onClick={reset} className="mt-4 inline-flex min-h-11 items-center text-base font-medium text-muted underline underline-offset-4 hover:text-ink">
           {t.newReservation}
@@ -405,33 +408,6 @@ export function RegistrationForm(props: {
         )}
       </fieldset>
 
-      <div>
-        <label htmlFor={`${id}-email`} className="block text-lg font-semibold">
-          {t.email} <span className="font-normal text-muted">({t.optional})</span>
-        </label>
-        <p id={`${id}-email-hint`} className="mb-2 text-base text-muted">
-          {t.emailHint}
-        </p>
-        <input
-          id={`${id}-email`}
-          name="email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          enterKeyHint="done"
-          maxLength={254}
-          className="field-input"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            clearError("email");
-          }}
-          aria-invalid={err("email") ? true : undefined}
-          aria-describedby={describedBy("email", true)}
-        />
-        {err("email") && <FieldError id={`${id}-email-err`} text={err("email")!} />}
-      </div>
-
       {/* Honeypot: invisible to people, tempting to bots. */}
       <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">
         <label>
@@ -440,29 +416,13 @@ export function RegistrationForm(props: {
         </label>
       </div>
 
-      <div>
-        <label className="flex cursor-pointer items-start gap-4 rounded-xl p-1">
-          <input
-            type="checkbox"
-            checked={privacy}
-            onChange={(e) => {
-              setPrivacy(e.target.checked);
-              clearError("privacyAccepted");
-            }}
-            className="mt-0.5 size-7 shrink-0 cursor-pointer accent-ink"
-            aria-invalid={err("privacyAccepted") ? true : undefined}
-            aria-describedby={err("privacyAccepted") ? `${id}-privacyAccepted-err` : undefined}
-          />
-          <span className="text-base leading-relaxed text-thread">
-            {t.privacyLabelBefore}
-            <Link href="/privacy" target="_blank" className="font-semibold text-ink underline underline-offset-4">
-              {t.privacyLink}
-            </Link>
-            {t.privacyLabelAfter}
-          </span>
-        </label>
-        {err("privacyAccepted") && <FieldError id={`${id}-privacyAccepted-err`} text={err("privacyAccepted")!} />}
-      </div>
+      <p className="text-base leading-relaxed text-muted">
+        {t.privacyBefore}
+        <Link href="/privacy" target="_blank" className="font-semibold text-ink underline underline-offset-4">
+          {t.privacyLink}
+        </Link>
+        {t.privacyAfter}
+      </p>
 
       <button type="submit" className="btn-primary w-full text-xl" disabled={submitting} aria-busy={submitting}>
         {submitting ? (
@@ -475,7 +435,32 @@ export function RegistrationForm(props: {
           t.submitPlaces(guests)
         )}
       </button>
+      <WhatsAppLink number={props.whatsappNumber} label={t.whatsappQuestion} message={`Hallo! Ich habe eine Frage zur Veranstaltung „${props.event.name}“${props.event.dateTextDe ? ` am ${props.event.dateTextDe}` : ""}.`} />
     </form>
+  );
+}
+
+/** Free WhatsApp click-to-chat link (wa.me) with a pre-filled German message. Hidden when no number is set. */
+function WhatsAppLink({ number, label, message }: { number: string; label: string; message: string }) {
+  if (!number) return null;
+  return (
+    <a
+      href={`https://wa.me/${number.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex min-h-11 items-center justify-center gap-2 text-base font-semibold text-moss underline-offset-4 hover:underline"
+    >
+      <WhatsAppIcon />
+      {label}
+    </a>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-5 shrink-0" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-.7-.3-1.4-.7-2-1.3-.5-.5-.9-1-1.3-1.6-.1-.2 0-.4.1-.5l.4-.5.2-.4v-.4l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.6.6-.9 1.3-.9 2.1.1.9.4 1.8 1 2.6 1 1.5 2.3 2.7 3.9 3.5 1.4.6 2 .7 2.7.6.5-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1l-.6-.3z" />
+    </svg>
   );
 }
 

@@ -31,10 +31,6 @@ export function EditRegistrationForm(props: {
         <input name="phone" type="tel" defaultValue={i.phone} required className={input} />
       </label>
       <label>
-        <span className="mb-1 block text-sm font-medium">Email (optional)</span>
-        <input name="email" type="email" defaultValue={i.email} className={input} />
-      </label>
-      <label>
         <span className="mb-1 block text-sm font-medium">Number of guests</span>
         <input name="guestCount" type="number" min={1} max={50} defaultValue={i.guestCount} required className={input} />
       </label>

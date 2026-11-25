@@ -54,9 +54,7 @@ async function register(overrides = {}, { ip } = {}) {
   const body = {
     fullName: "Test Guest",
     phone: `+49176${phoneCounter++}`,
-    email: "",
     guestCount: 2,
-    privacyAccepted: true,
     idempotencyKey: crypto.randomUUID(),
     locale: "en",
     acceptWaitlist: false,
@@ -121,7 +119,7 @@ try {
   console.log("Validation & spam protection");
   check("too many guests rejected", (await register({ guestCount: 99 })).data.fields?.guestCount === "guests_too_many");
   check("invalid phone rejected", (await register({ phone: "12" })).data.fields?.phone === "phone_invalid");
-  check("missing privacy consent rejected", (await register({ privacyAccepted: false })).data.fields?.privacyAccepted === "privacy_required");
+  check("no email or checkbox needed (name, phone, guests only)", (await register({ privacyAccepted: undefined, email: undefined })).status === 201);
   check("honeypot rejected", (await register({ website: "http://spam" })).status === 400);
   check("submitted too fast → 425", (await register({ formToken: await token(0) })).status === 425);
   const forged = await register({ formToken: "forged.token.value" });

@@ -5,8 +5,9 @@ Guests reserve free places in under 30 seconds on their phone. Organizers watch 
 manage the guest list and edit all event information from a private dashboard. Every new
 registration is pushed to **n8n**.
 
-- **Public site** (`/`): event page, EN/DE, reservation form, confirmation with registration number,
-  calendar file and WhatsApp share. Privacy notice (`/privacy`) and Impressum (`/imprint`).
+- **Public site** (`/`): event page, EN/DE, reservation form on the first screen (name, phone, number
+  of guests), confirmation with registration number, calendar file, WhatsApp share and an optional
+  WhatsApp contact button (free wa.me link). Privacy notice (`/privacy`) and Impressum (`/imprint`).
 - **Dashboard** (`/admin`): overview with capacity and daily activity, searchable registration list
   with inline status changes (check-in at the door works on a phone), edit/cancel, CSV export,
   event settings, webhook health, one-click deletion of personal data.
@@ -121,7 +122,7 @@ tracked in `schema_migrations`).
 | Table | Contents |
 |---|---|
 | `event_settings` | Exactly one row: all editable event information, capacity, switches, legal details, retention |
-| `registrations` | `reference` (REG-000001), name, phone (E.164), optional email, `guest_count`, `status` (`confirmed` / `waitlisted` / `checked_in` / `cancelled`), idempotency key, consent timestamp, note, webhook delivery status |
+| `registrations` | `reference` (REG-000001), name, phone (E.164), `guest_count`, `status` (`confirmed` / `waitlisted` / `checked_in` / `cancelled`), idempotency key, privacy-notice timestamp, note, webhook delivery status |
 | `rate_limit_hits` | Salted hashes for rate limiting, purged after 24 h |
 
 Capacity used = sum of `guest_count` for `confirmed` + `checked_in`. Waiting-list and cancelled
@@ -169,10 +170,10 @@ limiting uses them). Schedule the maintenance job, e.g. hourly:
 
 ## Connect n8n
 
-Setup steps (import, secret, Telegram, Gmail, activation, troubleshooting): **[DEPLOYMENT.md, Part 4](DEPLOYMENT.md#part-4-connect-your-n8n-15-minutes)**.
+Setup steps (import, secret, Telegram, activation, troubleshooting): **[DEPLOYMENT.md, Part 4](DEPLOYMENT.md#part-4-connect-your-n8n-15-minutes)**.
 The workflow [`n8n/new-registration-workflow.json`](n8n/new-registration-workflow.json) was verified by
 importing it into n8n 2.47 and running it with real registrations from the app (secret check, EN/DE
-messages, email branch).
+messages).
 
 Request sent for each new registration:
 
@@ -227,8 +228,9 @@ The dashboard shows delivered / waiting / failed counts.
 
 ## GDPR checklist
 
-What the app does: data minimisation (name, phone, group size; email optional), privacy notice in
-EN/DE, required acknowledgement checkbox with timestamp, no tracking or third-party requests, IPs only
+What the app does: data minimisation (name, phone, group size only), short privacy notice with a link
+to the full notice above the Reserve button (legal basis Art. 6(1)(b) GDPR, no consent checkbox needed;
+submission time is stored), no tracking or third-party requests, IPs only
 as salted hashes for 24 h, automatic anonymisation after the retention period, manual "delete now",
 HTTPS security headers, admin area not indexed.
 
@@ -237,7 +239,7 @@ What **you** need to do:
 - [ ] Fill in organizer name, postal address and contact in Event settings (Impressum, § 5 DDG).
 - [ ] Sign the data processing agreements (AVV/DPA) with your hosts (Vercel, Supabase or your server
       provider) and choose EU regions. List the providers in "Additional privacy information".
-- [ ] If n8n forwards data (Telegram, Gmail…), mention those services in the privacy notice too.
+- [ ] If n8n forwards data (e.g. Telegram), mention those services in the privacy notice too.
 - [ ] Have the privacy notice reviewed. The included text is a solid starting point, not legal advice.
 - [ ] Keep the retention period short (default 30 days after the event).
 - [ ] Limit who knows the admin password; change it after the event.
