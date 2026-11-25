@@ -10,7 +10,8 @@ import { env } from "@/lib/env";
 import { normalizePhone } from "@/lib/phone";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { anonymizeRegistrations, setStatus, updateRegistration } from "@/lib/registrations";
-import { STATUSES, type RegistrationStatus } from "@/lib/types";
+import { STATUSES, TRANSLATABLE_FIELDS, type RegistrationStatus } from "@/lib/types";
+import { LOCALES, type Locale } from "@/lib/i18n";
 import { adminRegistrationSchema, settingsSchema } from "@/lib/validation";
 import { retryPendingWebhooks } from "@/lib/webhook";
 
@@ -86,7 +87,7 @@ export async function retryWebhooksAction(): Promise<ActionState> {
 // ----------------------------------------------------------------- settings
 export async function saveSettingsAction(_: ActionState, form: FormData): Promise<ActionState> {
   await requireAdmin();
-  const raw: Record<string, unknown> = Object.fromEntries(form.entries());
+  const raw: Record<string, unknown> = Object.fromEntries([...form.entries()].filter(([k]) => !k.startsWith("tr.")));
   raw.registration_open = form.get("registration_open") === "on";
   raw.waitlist_enabled = form.get("waitlist_enabled") === "on";
   const parsed = settingsSchema.safeParse(raw);
@@ -101,8 +102,17 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     if (!n) return { error: 'Check the field "WhatsApp number": use a mobile number like +49 176 1234567.' };
     whatsapp = n;
   }
+  // Translations: fields named "tr.<lang>.<field>"; empty values are dropped (German is shown instead).
+  const translations: Record<string, Record<string, string>> = {};
+  for (const [key, value] of form.entries()) {
+    const m = /^tr\.([a-z]{2})\.([a-z_]+)$/.exec(key);
+    if (!m || m[1] === "de" || !LOCALES.includes(m[1] as Locale) || !(TRANSLATABLE_FIELDS as readonly string[]).includes(m[2])) continue;
+    const text = String(value).replace(/\r\n/g, "\n").trim().slice(0, 3000);
+    if (text) (translations[m[1]] ??= {})[m[2]] = text;
+  }
   const values = {
     ...s,
+    translations: db().json(translations),
     whatsapp_number: whatsapp,
     event_date: s.event_date || null,
     start_time: s.start_time || null,

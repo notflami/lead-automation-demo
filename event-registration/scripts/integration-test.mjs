@@ -203,6 +203,16 @@ try {
   check("privacy notice names the organizer and retention period", priv.includes("Test Verein e.V.") && priv.includes("30"));
   check("Impressum shows organizer, address and contact", imp.includes("Test Verein e.V.") && imp.includes("Teststraße 1") && imp.includes("kontakt@example.org"));
 
+  console.log("Translated event texts");
+  await sql`update event_settings set tagline = 'Deutscher Untertitel', dress_code = 'Deutscher Dresscode',
+            translations = ${sql.json({ en: { tagline: "English subtitle", dress_code: "" } })} where id = 1`;
+  const page = (lang) => fetch(BASE + "/", { headers: { Cookie: `lang=${lang}` } }).then((r) => r.text());
+  const [enPage, dePage, trPage] = await Promise.all([page("en"), page("de"), page("tr")]);
+  check("English visitor sees the English text", enPage.includes("English subtitle") && !enPage.includes("Deutscher Untertitel"));
+  check("empty translation falls back to German", enPage.includes("Deutscher Dresscode"));
+  check("German page and untranslated language show German", dePage.includes("Deutscher Untertitel") && trPage.includes("Deutscher Untertitel"));
+  await sql`update event_settings set translations = '{}'::jsonb where id = 1`;
+
   console.log("Public pages");
   for (const p of ["/", "/privacy", "/imprint", "/api/calendar"]) check(`GET ${p} → 200`, (await fetch(BASE + p)).status === 200);
   const ics = await fetch(BASE + "/api/calendar").then((r) => r.text());
