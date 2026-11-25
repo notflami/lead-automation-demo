@@ -43,3 +43,13 @@ export function splitLines(text: string): string[] {
     .map((l) => l.replace(/^[-•*]\s*/, "").trim())
     .filter(Boolean);
 }
+
+/** "20 €" / "€20" / "20,50 €" — no decimals for whole euros. */
+export function formatPrice(cents: number, locale: Locale): string {
+  return new Intl.NumberFormat(tag(locale), {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: cents % 100 ? 2 : 0,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}

@@ -30,6 +30,8 @@ export interface EventSettings {
   additional_info: string;
   max_capacity: number;
   vip_capacity: number;
+  price_normal_cents: number;
+  price_vip_cents: number;
   ticket_normal_info: string;
   ticket_vip_info: string;
   max_guests_per_registration: number;

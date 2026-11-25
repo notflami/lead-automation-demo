@@ -236,3 +236,13 @@ insert into schema_migrations (name) values ('006_text_translations.sql') on con
 -- Minimum age shown as a small notice at the top of the event page (0 = no notice).
 alter table event_settings add column if not exists min_age integer not null default 18 check (min_age between 0 and 99);
 insert into schema_migrations (name) values ('007_min_age.sql') on conflict do nothing;
+
+-- ===== 008_ticket_prices.sql =====
+-- Ticket prices in cents (0 = no price shown). Display only for now; online payment comes later.
+alter table event_settings add column if not exists price_normal_cents integer not null default 0 check (price_normal_cents between 0 and 1000000);
+alter table event_settings add column if not exists price_vip_cents    integer not null default 0 check (price_vip_cents between 0 and 1000000);
+
+-- Prices agreed for the event: normal ticket 20 €, VIP place 30 € (only if no prices were set yet).
+update event_settings set price_normal_cents = 2000, price_vip_cents = 3000
+ where id = 1 and price_normal_cents = 0 and price_vip_cents = 0;
+insert into schema_migrations (name) values ('008_ticket_prices.sql') on conflict do nothing;

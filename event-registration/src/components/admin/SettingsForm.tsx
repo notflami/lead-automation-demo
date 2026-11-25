@@ -66,6 +66,12 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         <Field label="VIP places (people)" hint="Part of the maximum capacity. 0 hides the VIP option.">
           <input name="vip_capacity" type="number" min={0} max={100000} defaultValue={v.vip_capacity} required className={input} />
         </Field>
+        <Field label="Normal ticket price (€)" hint="Per person. 0 hides the price.">
+          <input name="price_normal_eur" type="number" min={0} step="0.01" defaultValue={(v.price_normal_cents / 100).toString()} required className={input} />
+        </Field>
+        <Field label="VIP place price (€)" hint="Per person. 0 hides the price.">
+          <input name="price_vip_eur" type="number" min={0} step="0.01" defaultValue={(v.price_vip_cents / 100).toString()} required className={input} />
+        </Field>
         <Field label="Normal ticket: short info" hint="Optional, shown under the option (e.g. price or what is included).">
           <input name="ticket_normal_info" defaultValue={v.ticket_normal_info} maxLength={200} className={input} />
         </Field>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { listRegistrations } from "@/lib/registrations";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +15,15 @@ function cell(v: unknown): string {
 export async function GET(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const url = new URL(req.url);
+  const s = await getSettings();
+  const amount = (r: { guest_count: number; ticket_type: string }) =>
+    ((r.guest_count * (r.ticket_type === "vip" ? s.price_vip_cents : s.price_normal_cents)) / 100).toFixed(2).replace(".", ",");
   const rows = await listRegistrations({ q: url.searchParams.get("q") || "", status: url.searchParams.get("status") || "all" });
   const tz = process.env.EVENT_TIMEZONE || "Europe/Berlin";
   const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: tz, dateStyle: "short", timeStyle: "medium" });
-  const header = ["Registration ID", "Full name", "Phone", "Guests", "Ticket", "Status", "Registered at", "Note"];
+  const header = ["Registration ID", "Full name", "Phone", "Guests", "Ticket", "Amount (EUR)", "Status", "Registered at", "Note"];
   const lines = rows.map((r) =>
-    [r.reference, r.full_name, r.phone, r.guest_count, r.ticket_type === "vip" ? "VIP" : "Normal", r.status, fmt.format(new Date(r.created_at)), r.admin_note]
+    [r.reference, r.full_name, r.phone, r.guest_count, r.ticket_type === "vip" ? "VIP" : "Normal", amount(r), r.status, fmt.format(new Date(r.created_at)), r.admin_note]
       .map(cell)
       .join(";"),
   );

@@ -103,6 +103,8 @@ export const settingsSchema = z.object({
   additional_info: optionalText(2000),
   max_capacity: z.coerce.number().int().min(1).max(100000),
   vip_capacity: z.coerce.number().int().min(0).max(100000),
+  price_normal_cents: z.coerce.number().int().min(0).max(1000000),
+  price_vip_cents: z.coerce.number().int().min(0).max(1000000),
   ticket_normal_info: optionalText(200),
   ticket_vip_info: optionalText(200),
   max_guests_per_registration: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),

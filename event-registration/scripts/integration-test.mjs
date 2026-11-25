@@ -213,6 +213,16 @@ try {
   check("German page and untranslated language show German", dePage.includes("Deutscher Untertitel") && trPage.includes("Deutscher Untertitel"));
   await sql`update event_settings set translations = '{}'::jsonb where id = 1`;
 
+  console.log("Ticket prices");
+  await reset({ max_capacity: 100, vip_capacity: 20, price_normal_cents: 2000, price_vip_cents: 3000 });
+  const priced = await fetch(BASE + "/").then((r) => r.text());
+  check("prices shown on the ticket options (20 € / 30 €)", priced.includes("20\u00a0€") && priced.includes("30\u00a0€"));
+  hooks.length = 0;
+  const vipReg = await register({ guestCount: 3, ticketType: "vip" });
+  await sleep(800);
+  const vipHook = hooks.find((x) => x.body.registration_id === vipReg.data.registration?.reference);
+  check("webhook carries ticket value (3 × 30 € = 90)", vipHook?.body.amount_eur === 90 && vipHook?.body.ticket_type === "vip", JSON.stringify(vipHook?.body));
+
   console.log("Age notice");
   await sql`update event_settings set min_age = 18 where id = 1`;
   check("18+ notice shown (German default)", (await fetch(BASE + "/").then((r) => r.text())).includes("Einlass ab 18 Jahren"));
