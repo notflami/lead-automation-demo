@@ -62,6 +62,15 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         <Field label="Maximum capacity (people)" hint={`${reservedPlaces} places are reserved right now.`}>
           <input name="max_capacity" type="number" min={1} max={100000} defaultValue={v.max_capacity} required className={input} />
         </Field>
+        <Field label="VIP places (people)" hint="Part of the maximum capacity. 0 hides the VIP option.">
+          <input name="vip_capacity" type="number" min={0} max={100000} defaultValue={v.vip_capacity} required className={input} />
+        </Field>
+        <Field label="Normal ticket: short info" hint="Optional, shown under the option (e.g. price or what is included).">
+          <input name="ticket_normal_info" defaultValue={v.ticket_normal_info} maxLength={200} className={input} />
+        </Field>
+        <Field label="VIP place: short info" hint="Optional, shown under the option.">
+          <input name="ticket_vip_info" defaultValue={v.ticket_vip_info} maxLength={200} className={input} />
+        </Field>
         <Field label="Maximum people per registration" hint="Larger groups must contact you.">
           <input name="max_guests_per_registration" type="number" min={1} max={50} defaultValue={v.max_guests_per_registration} required className={input} />
         </Field>

@@ -47,6 +47,7 @@ export async function updateRegistrationAction(id: string, _: ActionState, form:
     email: form.get("email") ?? "",
     guestCount: form.get("guestCount"),
     status: form.get("status"),
+    ticketType: form.get("ticketType") ?? "normal",
     adminNote: form.get("adminNote") ?? "",
   });
   if (!parsed.success) {
@@ -60,6 +61,7 @@ export async function updateRegistrationAction(id: string, _: ActionState, form:
     phone,
     email: parsed.data.email || null,
     status: parsed.data.status as RegistrationStatus,
+    ticketType: parsed.data.ticketType,
   });
   if (!res.ok) return { error: res.error };
   revalidatePath("/admin", "layout");

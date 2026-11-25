@@ -1,6 +1,6 @@
-import type { Locale } from "./i18n";
+import { intlTag, type Locale } from "./i18n";
 
-const tag = (l: Locale) => (l === "de" ? "de-DE" : "en-GB");
+const tag = (l: Locale) => intlTag(l);
 
 /** "Saturday, 12 December 2026" — date-only values are formatted in UTC to avoid day shifts. */
 export function formatEventDate(date: string | null, locale: Locale): string {

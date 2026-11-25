@@ -8,19 +8,26 @@ import type { Sql, TransactionSql } from "postgres";
 
 export type CreateResult =
   | { ok: true; registration: Registration; duplicate: boolean }
-  | { ok: false; reason: "closed" | "full" | "not_enough"; remaining: number; waitlistAvailable: boolean }
+  | { ok: false; reason: "closed" | "full" | "not_enough" | "vip_full" | "vip_not_enough"; remaining: number; waitlistAvailable: boolean }
   | { ok: false; reason: "phone_taken" };
 
-const REG_COLUMNS = `id, reference, full_name, phone, email, guest_count, status, locale, admin_note,
+const REG_COLUMNS = `id, reference, full_name, phone, email, guest_count, ticket_type, status, locale, admin_note,
   created_at, updated_at, cancelled_at, anonymized_at, webhook_status, webhook_attempts,
   webhook_last_error, webhook_sent_at`;
 
 async function reservedPlaces(tx: Sql | TransactionSql, excludeId?: string): Promise<number> {
-  const [{ total }] = await tx<{ total: number }[]>`
-    select coalesce(sum(guest_count), 0)::int as total from registrations
+  return (await reservedSplit(tx, excludeId)).total;
+}
+
+/** Seated places in total and in VIP (confirmed + checked in). */
+async function reservedSplit(tx: Sql | TransactionSql, excludeId?: string): Promise<{ total: number; vip: number }> {
+  const [row] = await tx<{ total: number; vip: number }[]>`
+    select coalesce(sum(guest_count), 0)::int as total,
+           coalesce(sum(guest_count) filter (where ticket_type = 'vip'), 0)::int as vip
+    from registrations
     where status in ('confirmed', 'checked_in')
       ${excludeId ? tx`and id <> ${excludeId}` : tx``}`;
-  return total;
+  return row;
 }
 
 /**
@@ -31,8 +38,8 @@ async function reservedPlaces(tx: Sql | TransactionSql, excludeId?: string): Pro
 export async function createRegistration(input: RegistrationInput): Promise<CreateResult> {
   const sql = db();
   return sql.begin(async (tx) => {
-    const [settings] = await tx<{ max_capacity: number; registration_open: boolean; waitlist_enabled: boolean }[]>`
-      select max_capacity, registration_open, waitlist_enabled from event_settings where id = 1 for update`;
+    const [settings] = await tx<{ max_capacity: number; vip_capacity: number; registration_open: boolean; waitlist_enabled: boolean }[]>`
+      select max_capacity, vip_capacity, registration_open, waitlist_enabled from event_settings where id = 1 for update`;
 
     // Checked AFTER taking the lock, so two simultaneous identical submissions can't both pass.
     // Same idempotency key = same form submission (double tap, retry on flaky mobile network).
@@ -48,9 +55,13 @@ export async function createRegistration(input: RegistrationInput): Promise<Crea
       where phone = ${input.phone} and status <> 'cancelled' and anonymized_at is null limit 1`;
     if (phoneTaken) return { ok: false, reason: "phone_taken" } as const;
 
+    const seated = await reservedSplit(tx);
     const decision = decideCapacity({
       guests: input.guestCount,
-      reservedPlaces: await reservedPlaces(tx),
+      reservedPlaces: seated.total,
+      ticketType: input.ticketType,
+      vipReserved: seated.vip,
+      vipCapacity: settings.vip_capacity,
       maxCapacity: settings.max_capacity,
       registrationOpen: settings.registration_open,
       waitlistEnabled: settings.waitlist_enabled,
@@ -61,10 +72,10 @@ export async function createRegistration(input: RegistrationInput): Promise<Crea
     const [registration] = await tx.unsafe<Registration[]>(
       // privacy_accepted_at = when the guest submitted the form with the privacy notice shown above the button.
       `insert into registrations
-         (full_name, phone, guest_count, status, locale, idempotency_key, privacy_accepted_at)
-       values ($1, $2, $3, $4, $5, $6, now())
+         (full_name, phone, guest_count, ticket_type, status, locale, idempotency_key, privacy_accepted_at)
+       values ($1, $2, $3, $4, $5, $6, $7, now())
        returning ${REG_COLUMNS}`,
-      [input.fullName, input.phone, input.guestCount, decision.status, input.locale, input.idempotencyKey],
+      [input.fullName, input.phone, input.guestCount, input.ticketType, decision.status, input.locale, input.idempotencyKey],
     );
     return { ok: true, registration, duplicate: false } as const;
   });
@@ -81,6 +92,7 @@ export async function getStats(): Promise<CapacityStats> {
         wl_regs: number;
         wl_places: number;
         cancelled: number;
+        vip: number;
       }[]
     >`
       select
@@ -89,9 +101,10 @@ export async function getStats(): Promise<CapacityStats> {
         coalesce(sum(guest_count) filter (where status = 'checked_in'), 0)::int                     as checked_in,
         count(*) filter (where status = 'waitlisted')::int                                         as wl_regs,
         coalesce(sum(guest_count) filter (where status = 'waitlisted'), 0)::int                     as wl_places,
-        count(*) filter (where status = 'cancelled')::int                                          as cancelled
+        count(*) filter (where status = 'cancelled')::int                                          as cancelled,
+        coalesce(sum(guest_count) filter (where status in ('confirmed', 'checked_in') and ticket_type = 'vip'), 0)::int as vip
       from registrations`,
-    sql<{ max_capacity: number }[]>`select max_capacity from event_settings where id = 1`,
+    sql<{ max_capacity: number; vip_capacity: number }[]>`select max_capacity, vip_capacity from event_settings where id = 1`,
   ]);
   return {
     registrations: row.registrations,
@@ -102,13 +115,16 @@ export async function getStats(): Promise<CapacityStats> {
     cancelledRegistrations: row.cancelled,
     maxCapacity: settings.max_capacity,
     remaining: Math.max(0, settings.max_capacity - row.reserved),
+    vipReservedPlaces: row.vip,
+    vipCapacity: settings.vip_capacity,
     averageGuests: row.registrations ? Math.round((row.reserved / row.registrations) * 10) / 10 : 0,
   };
 }
 
-/** Public, non-personal availability figure for the landing page. */
-export async function getRemainingPlaces(maxCapacity: number): Promise<number> {
-  return Math.max(0, maxCapacity - (await reservedPlaces(db())));
+/** Public, non-personal availability figures for the landing page. */
+export async function getRemainingPlaces(maxCapacity: number, vipCapacity = 0): Promise<{ total: number; vip: number }> {
+  const seated = await reservedSplit(db());
+  return { total: Math.max(0, maxCapacity - seated.total), vip: Math.max(0, vipCapacity - seated.vip) };
 }
 
 export async function listRegistrations(opts: { q?: string; status?: string; limit?: number }): Promise<Registration[]> {
@@ -149,11 +165,19 @@ export type UpdateResult = { ok: true } | { ok: false; error: string };
 /** Admin edit. Re-checks capacity under the same lock when places would increase. */
 export async function updateRegistration(
   id: string,
-  patch: { fullName: string; phone: string; email: string | null; guestCount: number; status: RegistrationStatus; adminNote: string },
+  patch: {
+    fullName: string;
+    phone: string;
+    email: string | null;
+    guestCount: number;
+    ticketType: "normal" | "vip";
+    status: RegistrationStatus;
+    adminNote: string;
+  },
 ): Promise<UpdateResult> {
   return db().begin(async (tx) => {
-    const [settings] = await tx<{ max_capacity: number }[]>`
-      select max_capacity from event_settings where id = 1 for update`;
+    const [settings] = await tx<{ max_capacity: number; vip_capacity: number }[]>`
+      select max_capacity, vip_capacity from event_settings where id = 1 for update`;
     const [current] = await tx<{ status: RegistrationStatus; guest_count: number; anonymized_at: Date | null }[]>`
       select status, guest_count, anonymized_at from registrations where id = ${id} for update`;
     if (!current) return { ok: false, error: "Registration not found." };
@@ -161,7 +185,15 @@ export async function updateRegistration(
 
     const seated = patch.status === "confirmed" || patch.status === "checked_in";
     if (seated) {
-      const others = await reservedPlaces(tx, id);
+      const split = await reservedSplit(tx, id);
+      if (patch.ticketType === "vip" && split.vip + patch.guestCount > settings.vip_capacity) {
+        const free = Math.max(0, settings.vip_capacity - split.vip);
+        return {
+          ok: false,
+          error: `Not enough VIP places: only ${free} VIP place(s) available. Raise the VIP capacity in Event settings, reduce the guests, or use a normal ticket.`,
+        };
+      }
+      const others = split.total;
       if (others + patch.guestCount > settings.max_capacity) {
         const free = Math.max(0, settings.max_capacity - others);
         return {
@@ -179,7 +211,7 @@ export async function updateRegistration(
     await tx`
       update registrations set
         full_name = ${patch.fullName}, phone = ${patch.phone}, email = ${patch.email},
-        guest_count = ${patch.guestCount}, status = ${patch.status}, admin_note = ${patch.adminNote},
+        guest_count = ${patch.guestCount}, ticket_type = ${patch.ticketType}, status = ${patch.status}, admin_note = ${patch.adminNote},
         cancelled_at = case when ${patch.status} = 'cancelled' then coalesce(cancelled_at, now()) else null end,
         updated_at = now()
       where id = ${id}`;
@@ -195,6 +227,7 @@ export async function setStatus(id: string, status: RegistrationStatus): Promise
     phone: reg.phone,
     email: reg.email,
     guestCount: reg.guest_count,
+    ticketType: reg.ticket_type,
     status,
     adminNote: reg.admin_note,
   });

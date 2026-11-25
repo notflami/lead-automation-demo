@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AutoRefresh } from "@/components/admin/AutoRefresh";
-import { STATUS_LABEL } from "@/components/admin/StatusBadge";
+import { STATUS_LABEL, VipBadge } from "@/components/admin/StatusBadge";
 import { StatusSelect } from "@/components/admin/StatusSelect";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
@@ -81,7 +81,9 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
                 {rows.map((r) => (
                   <tr key={r.id} className={r.status === "cancelled" ? "text-muted" : ""}>
                     <td className="px-4 py-2.5 font-mono text-sm tabular-nums">{r.reference}</td>
-                    <td className="px-4 py-2.5 font-medium">{r.full_name}</td>
+                    <td className="px-4 py-2.5 font-medium">
+                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />}
+                    </td>
                     <td className="px-4 py-2.5 tabular-nums">
                       <a href={`tel:${r.phone}`} className="hover:underline">{r.phone}</a>
                     </td>
@@ -107,7 +109,9 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
               <li key={r.id} className="rounded-xl bg-white p-4">
                 <div className="flex items-start gap-3">
                   <Link href={`/admin/registrations/${r.id}`} className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold text-ink">{r.full_name}</span>
+                    <span className="block truncate font-semibold text-ink">
+                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />}
+                    </span>
                     <span className="block text-sm text-muted tabular-nums">
                       {r.reference}, {r.phone}
                     </span>

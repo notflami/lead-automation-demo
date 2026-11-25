@@ -28,7 +28,7 @@
     {
       "parameters": {
         "chatId": "REPLACE_WITH_YOUR_CHAT_ID",
-        "text": "={{ $json.body.status === 'waitlisted' ? '⏳ Waiting list' : '✅ New reservation' }}: {{ $json.body.name }}\n{{ $json.body.guest_count }} people · {{ $json.body.registration_id }}\n{{ $json.body.phone }}",
+        "text": "={{ $json.body.status === 'waitlisted' ? '⏳ Waiting list' : '✅ New reservation' }}{{ $json.body.ticket_type === 'vip' ? ' ⭐ VIP' : '' }}: {{ $json.body.name }}\n{{ $json.body.guest_count }} people · {{ $json.body.registration_id }}\n{{ $json.body.phone }}",
         "additionalFields": {}
       },
       "id": "a1f0c2d4-0002-4c1e-9a10-000000000002",

@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { LOCALES, type Locale } from "./i18n";
 import { normalizePhone } from "./phone";
 import { STATUSES } from "./types";
+import { TICKET_TYPES, type TicketType } from "./capacity";
 
 export const MAX_GUESTS_HARD_LIMIT = 50;
 
@@ -10,13 +12,15 @@ export type FieldErrorCode =
   | "phone_invalid"
   | "guests_invalid"
   | "guests_too_many"
-  | "form_invalid";
+  | "form_invalid"
+  | "ticket_invalid";
 
 export interface RegistrationInput {
   fullName: string;
   phone: string; // normalised
   guestCount: number;
-  locale: "en" | "de";
+  ticketType: TicketType;
+  locale: Locale;
   idempotencyKey: string;
   acceptWaitlist: boolean;
 }
@@ -47,6 +51,9 @@ export function validateRegistration(
   if (!Number.isInteger(guestCount) || guestCount < 1) errors.guestCount = "guests_invalid";
   else if (guestCount > Math.min(opts.maxGuests, MAX_GUESTS_HARD_LIMIT)) errors.guestCount = "guests_too_many";
 
+  const ticketType = (body.ticketType ?? "normal") as TicketType;
+  if (!TICKET_TYPES.includes(ticketType)) errors.ticketType = "ticket_invalid";
+
   const idem = uuid.safeParse(body.idempotencyKey);
 
   if (Object.keys(errors).length || !idem.success) {
@@ -59,7 +66,8 @@ export function validateRegistration(
       fullName,
       phone: phone!,
       guestCount,
-      locale: body.locale === "de" ? "de" : "en",
+      ticketType,
+      locale: LOCALES.includes(body.locale as Locale) ? (body.locale as Locale) : "de",
       idempotencyKey: idem.data!,
       acceptWaitlist: body.acceptWaitlist === true,
     },
@@ -73,6 +81,7 @@ export const adminRegistrationSchema = z.object({
   email: z.union([z.literal(""), z.string().trim().toLowerCase().email().max(254)]),
   guestCount: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),
   status: z.enum(STATUSES as [string, ...string[]]),
+  ticketType: z.enum(["normal", "vip"]),
   adminNote: z.string().max(2000),
 });
 
@@ -93,6 +102,9 @@ export const settingsSchema = z.object({
   dress_code: optionalText(300),
   additional_info: optionalText(2000),
   max_capacity: z.coerce.number().int().min(1).max(100000),
+  vip_capacity: z.coerce.number().int().min(0).max(100000),
+  ticket_normal_info: optionalText(200),
+  ticket_vip_info: optionalText(200),
   max_guests_per_registration: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),
   low_capacity_threshold: z.coerce.number().int().min(0).max(100000),
   registration_open: z.boolean(),

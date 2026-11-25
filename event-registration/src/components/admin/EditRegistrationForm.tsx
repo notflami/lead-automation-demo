@@ -8,7 +8,7 @@ import { STATUS_LABEL } from "./StatusBadge";
 
 export function EditRegistrationForm(props: {
   id: string;
-  initial: { fullName: string; phone: string; email: string; guestCount: number; status: RegistrationStatus; adminNote: string };
+  initial: { fullName: string; phone: string; email: string; guestCount: number; ticketType: "normal" | "vip"; status: RegistrationStatus; adminNote: string };
 }) {
   const [state, action, pending] = useActionState(updateRegistrationAction.bind(null, props.id), null);
   const i = props.initial;
@@ -33,6 +33,13 @@ export function EditRegistrationForm(props: {
       <label>
         <span className="mb-1 block text-sm font-medium">Number of guests</span>
         <input name="guestCount" type="number" min={1} max={50} defaultValue={i.guestCount} required className={input} />
+      </label>
+      <label>
+        <span className="mb-1 block text-sm font-medium">Ticket</span>
+        <select name="ticketType" defaultValue={i.ticketType} className={input}>
+          <option value="normal">Normal ticket</option>
+          <option value="vip">VIP place</option>
+        </select>
       </label>
       <label>
         <span className="mb-1 block text-sm font-medium">Status</span>

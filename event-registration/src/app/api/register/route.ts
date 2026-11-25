@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
         registration: {
           reference: r.reference,
           guestCount: r.guest_count,
+          ticketType: r.ticket_type,
           status: r.status,
           firstName: r.full_name.split(" ")[0],
         },

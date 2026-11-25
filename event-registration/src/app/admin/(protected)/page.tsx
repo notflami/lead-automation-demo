@@ -60,6 +60,12 @@ export default async function OverviewPage() {
 
       <section className="rounded-xl bg-white p-5">
         <CapacityMeter stats={stats} />
+        {stats.vipCapacity > 0 && (
+          <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
+            VIP places: <span className="font-semibold text-ink tabular-nums">{stats.vipReservedPlaces}</span> of {stats.vipCapacity} reserved (
+            {Math.max(0, stats.vipCapacity - stats.vipReservedPlaces)} free)
+          </p>
+        )}
         {(stats.waitlistedRegistrations > 0 || stats.cancelledRegistrations > 0) && (
           <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
             {stats.waitlistedRegistrations > 0 && (

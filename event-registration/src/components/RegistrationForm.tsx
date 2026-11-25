@@ -19,13 +19,14 @@ export interface EventSummary {
 interface Confirmation {
   reference: string;
   guestCount: number;
+  ticketType?: "normal" | "vip";
   status: "confirmed" | "waitlisted";
   firstName: string;
   eventName: string;
 }
 
 const STORAGE_KEY = "reservation:v1";
-type FieldName = "fullName" | "phone" | "guestCount";
+type FieldName = "fullName" | "phone" | "guestCount" | "ticketType";
 
 function newKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -55,12 +56,14 @@ export function RegistrationForm(props: {
   siteUrl: string;
   /** Event WhatsApp number (E.164) or "" when not set. */
   whatsappNumber: string;
+  tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string };
 }) {
   const t = dictionaries[props.locale];
   const id = useId();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [guests, setGuests] = useState(1);
+  const [ticket, setTicket] = useState<"normal" | "vip">("normal");
   const [website, setWebsite] = useState(""); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -108,6 +111,7 @@ export function RegistrationForm(props: {
           fullName,
           phone,
           guestCount: guests,
+          ticketType: ticket,
           idempotencyKey: keyRef.current,
           locale: props.locale,
           acceptWaitlist,
@@ -172,6 +176,14 @@ export function RegistrationForm(props: {
       case "closed":
         setFormError(t.errors.closed);
         break;
+      case "vip_full":
+        setErrors({ ticketType: t.errors.vip_full });
+        setFormError(t.errors.vip_full);
+        break;
+      case "vip_not_enough":
+        setErrors({ ticketType: t.errors.vip_not_enough(data.remaining) });
+        setFormError(t.errors.vip_not_enough(data.remaining));
+        break;
       case "rate_limited":
         setFormError(t.errors.rate_limited);
         break;
@@ -212,6 +224,7 @@ export function RegistrationForm(props: {
     setFullName("");
     setPhone("");
     setGuests(1);
+    setTicket("normal");
     setErrors({});
     setFormError(null);
   }
@@ -245,6 +258,17 @@ export function RegistrationForm(props: {
                 {confirmation.guestCount} {t.person(confirmation.guestCount)}
               </dd>
             </div>
+            {confirmation.ticketType === "vip" && (
+              <div>
+                <dt className="text-base text-muted">{t.ticketLabel}</dt>
+                <dd className="flex items-center gap-2 text-xl font-semibold">
+                  <svg viewBox="0 0 24 24" className="size-5 text-saffron" fill="currentColor" aria-hidden="true">
+                    <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
+                  </svg>
+                  {t.ticketVip}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-base text-muted">{t.date}</dt>
               <dd className="text-xl font-semibold">
@@ -381,7 +405,7 @@ export function RegistrationForm(props: {
         <p id={`${id}-guestCount-hint`} className="mb-3 text-base text-muted">
           {t.guestsHint}
         </p>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 min-[380px]:gap-4">
           <StepButton label={t.fewer} disabled={guests <= 1} onClick={() => {
               setGuests((g) => Math.max(1, g - 1));
               clearError("guestCount");
@@ -391,7 +415,7 @@ export function RegistrationForm(props: {
           <output
             aria-live="polite"
             aria-describedby={describedBy("guestCount", true)}
-            className="min-w-[6.5rem] text-center"
+            className="min-w-[5rem] text-center min-[380px]:min-w-[6.5rem]"
           >
             <span className="display block text-5xl leading-none tabular-nums text-ink">{guests}</span>
             <span className="text-base text-muted">{t.person(guests)}</span>
@@ -408,6 +432,60 @@ export function RegistrationForm(props: {
         )}
       </fieldset>
 
+      {props.tickets.vipEnabled && (
+        <fieldset>
+          <legend className="mb-3 block text-lg font-semibold">{t.ticketHeading}</legend>
+          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup">
+            {(["normal", "vip"] as const).map((type) => {
+              const soldOut = type === "vip" && props.tickets.vipAvailable <= 0;
+              const info = type === "vip" ? props.tickets.vipInfo : props.tickets.normalInfo;
+              const checked = ticket === type;
+              return (
+                <label
+                  key={type}
+                  className={`relative flex min-h-16 cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition-colors ${
+                    soldOut
+                      ? "cursor-not-allowed border-ink/10 bg-linen/60 text-muted"
+                      : checked
+                        ? "border-ink bg-linen shadow-[inset_0_0_0_1px_var(--color-ink)]"
+                        : "border-[#c9c5ba] hover:border-ink/60"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="ticketType"
+                    value={type}
+                    checked={checked}
+                    disabled={soldOut}
+                    onChange={() => {
+                      setTicket(type);
+                      clearError("ticketType");
+                    }}
+                    className="mt-1 size-5 shrink-0 accent-ink"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 text-lg font-semibold">
+                      {type === "vip" && (
+                        <svg viewBox="0 0 24 24" className="size-5 text-saffron" fill="currentColor" aria-hidden="true">
+                          <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
+                        </svg>
+                      )}
+                      {type === "vip" ? t.ticketVip : t.ticketNormal}
+                    </span>
+                    {soldOut ? (
+                      <span className="block text-base">{t.vipSoldOut}</span>
+                    ) : (
+                      info && <span className="block text-base text-muted">{info}</span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {err("ticketType") && <FieldError id={`${id}-ticketType-err`} text={err("ticketType")!} />}
+        </fieldset>
+      )}
+
       {/* Honeypot: invisible to people, tempting to bots. */}
       <div className="absolute -left-[9999px] h-px w-px overflow-hidden" aria-hidden="true">
         <label>
@@ -421,7 +499,6 @@ export function RegistrationForm(props: {
         <Link href="/privacy" target="_blank" className="font-semibold text-ink underline underline-offset-4">
           {t.privacyLink}
         </Link>
-        {t.privacyAfter}
       </p>
 
       <button type="submit" className="btn-primary w-full text-xl" disabled={submitting} aria-busy={submitting}>
@@ -431,6 +508,8 @@ export function RegistrationForm(props: {
           </>
         ) : isWaitlist ? (
           t.submitWaitlist
+        ) : ticket === "vip" ? (
+          t.submitVipPlaces(guests)
         ) : (
           t.submitPlaces(guests)
         )}
@@ -483,7 +562,7 @@ function StepButton(props: { label: string; disabled: boolean; onClick: () => vo
       aria-label={props.label}
       disabled={props.disabled}
       onClick={props.onClick}
-      className="grid size-16 place-items-center rounded-full border-2 border-ink text-ink transition-colors hover:bg-ink hover:text-linen active:scale-95 disabled:cursor-not-allowed disabled:border-ink/20 disabled:text-ink/25 disabled:hover:bg-transparent"
+      className="grid size-16 shrink-0 place-items-center rounded-full border-2 border-ink text-ink transition-colors hover:bg-ink hover:text-linen active:scale-95 disabled:cursor-not-allowed disabled:border-ink/20 disabled:text-ink/25 disabled:hover:bg-transparent"
     >
       <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
         {props.children}

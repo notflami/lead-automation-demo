@@ -17,6 +17,9 @@ export interface EventSettings {
   dress_code: string;
   additional_info: string;
   max_capacity: number;
+  vip_capacity: number;
+  ticket_normal_info: string;
+  ticket_vip_info: string;
   max_guests_per_registration: number;
   low_capacity_threshold: number;
   registration_open: boolean;
@@ -38,6 +41,7 @@ export interface Registration {
   phone: string;
   email: string | null;
   guest_count: number;
+  ticket_type: "normal" | "vip";
   status: RegistrationStatus;
   locale: string;
   admin_note: string;
@@ -60,5 +64,7 @@ export interface CapacityStats {
   cancelledRegistrations: number;
   maxCapacity: number;
   remaining: number;
+  vipReservedPlaces: number;
+  vipCapacity: number;
   averageGuests: number;
 }

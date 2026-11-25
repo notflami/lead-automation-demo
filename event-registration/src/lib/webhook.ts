@@ -6,13 +6,14 @@ import type { Registration } from "./types";
 
 export const MAX_WEBHOOK_ATTEMPTS = 10;
 
-export function buildPayload(r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "status" | "locale" | "created_at">, eventName: string) {
+export function buildPayload(r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "ticket_type" | "status" | "locale" | "created_at">, eventName: string) {
   return {
     event: "new_registration",
     registration_id: r.reference,
     name: r.full_name,
     phone: r.phone,
     guest_count: r.guest_count,
+    ticket_type: r.ticket_type, // "normal" | "vip"
     status: r.status, // "confirmed" | "waitlisted"
     language: r.locale,
     event_name: eventName,

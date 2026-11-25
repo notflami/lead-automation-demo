@@ -5,8 +5,9 @@ Guests reserve free places in under 30 seconds on their phone. Organizers watch 
 manage the guest list and edit all event information from a private dashboard. Every new
 registration is pushed to **n8n**.
 
-- **Public site** (`/`): event page, EN/DE, reservation form on the first screen (name, phone, number
-  of guests), confirmation with registration number, calendar file, WhatsApp share and an optional
+- **Public site** (`/`): event page in 7 languages (DE, EN, SQ, BS, HR, SR, TR; menu with flags),
+  reservation form in a kilim-pattern frame on the first screen (name, phone, number of guests, normal
+  ticket or VIP place), confirmation with registration number, calendar file, WhatsApp share and an optional
   WhatsApp contact button (free wa.me link). Privacy notice (`/privacy`) and Impressum (`/imprint`).
 - **Dashboard** (`/admin`): overview with capacity and daily activity, searchable registration list
   with inline status changes (check-in at the door works on a phone), edit/cancel, CSV export,
@@ -43,7 +44,7 @@ connection, final tests and the legal details you must provide.
 | Concern | Approach |
 |---|---|
 | Stack | Next.js 16 (App Router) + TypeScript + Tailwind CSS 4, PostgreSQL via `postgres` driver. No ORM, no extra services. |
-| Capacity | Counted in **people**, not forms. Each registration runs in a transaction that locks the single `event_settings` row, so simultaneous submissions are serialised and can never overbook. |
+| Capacity | Counted in **people**, not forms. VIP places have their own limit within the total. Each registration runs in a transaction that locks the single `event_settings` row, so simultaneous submissions are serialised and can never overbook. |
 | Full event | Registration stops, or (if enabled) guests can **explicitly** join a waiting list. A group larger than the remaining places is told how many places are left. |
 | Duplicates | Each form carries an idempotency key, so double taps and network retries return the same registration. One active reservation per phone number (enforced by a unique index). |
 | Spam | Hidden honeypot field, signed "form issued at" token (min. 3 s to fill), per-IP rate limit (stored as salted hash only), strict validation. |

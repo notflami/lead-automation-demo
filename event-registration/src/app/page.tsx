@@ -1,4 +1,5 @@
 import { Embroidery, StitchDiamond } from "@/components/Embroidery";
+import { KilimFrame } from "@/components/KilimFrame";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { RegistrationForm, type FormMode } from "@/components/RegistrationForm";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -13,7 +14,8 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [{ locale, t }, s] = await Promise.all([getDict(), getSettings()]);
-  const [remaining, formToken] = await Promise.all([getRemainingPlaces(s.max_capacity), issueFormToken()]);
+  const [places, formToken] = await Promise.all([getRemainingPlaces(s.max_capacity, s.vip_capacity), issueFormToken()]);
+  const remaining = places.total;
 
   const mode: FormMode = !s.registration_open ? "closed" : remaining > 0 ? "open" : s.waitlist_enabled ? "waitlist" : "full";
   const dateText = formatEventDate(s.event_date, locale);
@@ -35,11 +37,11 @@ export default async function HomePage() {
       <header className="relative bg-ink text-linen">
         <div className="mx-auto max-w-6xl px-5 pt-4 pb-10 sm:px-8 md:pb-16">
           <div className="flex justify-end">
-            <LanguageSwitch locale={locale} label={t.switchTo} className="text-linen/90" />
+            <LanguageSwitch locale={locale} label={t.language} className="text-linen/90" />
           </div>
 
-          <div className="mt-2 grid items-start gap-6 md:mt-8 md:grid-cols-12 md:gap-10">
-            <div className="md:col-span-6 lg:col-span-7">
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)] items-start gap-6 md:mt-8 md:grid-cols-12 md:gap-10">
+            <div className="md:col-span-6">
               {dm && (
                 <p className="text-lg font-medium text-saffron md:hidden">
                   {dateText}
@@ -85,18 +87,18 @@ export default async function HomePage() {
               )}
             </div>
 
-            <section
+            <KilimFrame
               id="reserve"
               aria-labelledby={canAct ? "reserve-h" : undefined}
               aria-label={canAct ? undefined : t.formHeading}
-              className="scroll-mt-4 rounded-3xl bg-white p-5 text-ink shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)] sm:p-8 md:col-span-6 lg:col-span-5"
+              className="scroll-mt-4 md:col-span-6"
             >
               {canAct && (
                 <>
-                  <h2 id="reserve-h" className="display text-[1.65rem] leading-tight sm:text-3xl">
+                  <h2 id="reserve-h" className="display mb-4 text-[1.65rem] leading-tight min-[380px]:mb-0 sm:text-3xl">
                     {mode === "waitlist" ? t.joinWaitlistCta : t.formHeading}
                   </h2>
-                  <p className="mt-1 mb-5 text-base text-muted">{mode === "waitlist" ? t.formIntroWaitlist : t.formIntro}</p>
+                  <p className="mt-1 mb-5 hidden text-base text-muted min-[380px]:block">{mode === "waitlist" ? t.formIntroWaitlist : t.formIntro}</p>
                 </>
               )}
               <RegistrationForm
@@ -106,6 +108,12 @@ export default async function HomePage() {
                 formToken={formToken}
                 siteUrl={env.siteUrl()}
                 whatsappNumber={s.whatsapp_number}
+                tickets={{
+                  vipEnabled: s.vip_capacity > 0,
+                  vipAvailable: places.vip,
+                  normalInfo: s.ticket_normal_info,
+                  vipInfo: s.ticket_vip_info,
+                }}
                 event={{
                   name: s.event_name,
                   dateText,
@@ -115,7 +123,7 @@ export default async function HomePage() {
                   venueAddress: s.venue_address,
                 }}
               />
-            </section>
+            </KilimFrame>
           </div>
         </div>
       </header>

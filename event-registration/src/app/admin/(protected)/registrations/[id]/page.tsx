@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EditRegistrationForm } from "@/components/admin/EditRegistrationForm";
-import { StatusBadge } from "@/components/admin/StatusBadge";
+import { StatusBadge, VipBadge } from "@/components/admin/StatusBadge";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { getRegistration } from "@/lib/registrations";
@@ -27,6 +27,7 @@ export default async function RegistrationDetail({ params }: { params: Promise<{
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="display text-3xl text-ink">{r.full_name}</h1>
         <StatusBadge status={r.status} />
+        {r.ticket_type === "vip" && <VipBadge />}
       </div>
       <p className="font-mono text-lg text-kilim tabular-nums">{r.reference}</p>
 
@@ -44,6 +45,7 @@ export default async function RegistrationDetail({ params }: { params: Promise<{
                 phone: r.phone,
                 email: r.email ?? "",
                 guestCount: r.guest_count,
+                ticketType: r.ticket_type,
                 status: r.status,
                 adminNote: r.admin_note,
               }}

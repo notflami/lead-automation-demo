@@ -25,6 +25,14 @@ describe("decideCapacity (counts people, not forms)", () => {
   it("blocks everything when registration is closed", () => {
     expect(decideCapacity({ ...base, registrationOpen: false, guests: 1, acceptWaitlist: true })).toMatchObject({ ok: false, reason: "closed" });
   });
+  it("limits VIP places separately (VIP counts towards the total)", () => {
+    const vip = { ...base, maxCapacity: 100, ticketType: "vip" as const, vipCapacity: 5 };
+    expect(decideCapacity({ ...vip, guests: 5, vipReserved: 0 })).toEqual({ ok: true, status: "confirmed" });
+    expect(decideCapacity({ ...vip, guests: 3, vipReserved: 3 })).toMatchObject({ ok: false, reason: "vip_not_enough", remaining: 2 });
+    expect(decideCapacity({ ...vip, guests: 1, vipReserved: 5 })).toMatchObject({ ok: false, reason: "vip_full" });
+    expect(decideCapacity({ ...vip, guests: 2, vipReserved: 0, reservedPlaces: 99 })).toMatchObject({ ok: false, reason: "not_enough" });
+    expect(decideCapacity({ ...vip, ticketType: "normal", guests: 2, vipReserved: 5 })).toMatchObject({ ok: true });
+  });
   it("never reports negative remaining after capacity was lowered", () => {
     expect(decideCapacity({ ...base, reservedPlaces: 15, guests: 1 })).toMatchObject({ remaining: 0 });
   });
@@ -68,6 +76,15 @@ describe("validateRegistration", () => {
   it("rejects links in the name field (spam)", () => {
     const r = validateRegistration({ ...good, fullName: "Buy now http://spam.example" }, opts);
     expect(!r.ok && r.errors.fullName).toBe("name_invalid");
+  });
+  it("accepts the seven languages and both ticket types, rejects unknown tickets", () => {
+    for (const locale of ["de", "en", "sq", "bs", "hr", "sr", "tr"]) {
+      const r = validateRegistration({ ...good, locale, ticketType: "vip" }, opts);
+      expect(r.ok && r.data.locale).toBe(locale);
+    }
+    expect(validateRegistration({ ...good, ticketType: "gold" }, opts).ok).toBe(false);
+    const r = validateRegistration({ ...good, locale: "xx" }, opts);
+    expect(r.ok && r.data.ticketType).toBe("normal");
   });
   it("rejects fractional / string guest counts", () => {
     expect(validateRegistration({ ...good, guestCount: 2.5 }, opts).ok).toBe(false);

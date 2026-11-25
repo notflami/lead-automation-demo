@@ -73,7 +73,7 @@ async function reset(settings) {
   await sql`truncate registrations, rate_limit_hits`;
   await sql`alter sequence registration_number_seq restart 1`;
   await sql`update event_settings set registration_open = true, waitlist_enabled = false, max_capacity = 20,
-            max_guests_per_registration = 8 where id = 1`;
+            vip_capacity = 20, max_guests_per_registration = 8 where id = 1`;
   if (settings) await sql`update event_settings set ${sql(settings)} where id = 1`;
 }
 const reserved = async () =>
@@ -148,6 +148,15 @@ try {
   const cron = await fetch(`${BASE}/api/cron`, { headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` } }).then((r) => r.json());
   const [row2] = await sql`select webhook_status from registrations where reference = ${reg2.data.registration.reference}`;
   check("cron retry delivers the failed webhook", cron.webhooks?.sent >= 1 && row2.webhook_status === "sent", JSON.stringify(cron));
+
+  console.log("VIP places");
+  await reset({ max_capacity: 50, vip_capacity: 6 });
+  const vipRuns = await Promise.all(Array.from({ length: 10 }, () => register({ guestCount: 2, ticketType: "vip" })));
+  const [vipRow] = await sql`select coalesce(sum(guest_count),0)::int as n from registrations where ticket_type = 'vip' and status = 'confirmed'`;
+  check("10 simultaneous VIP pairs for 6 VIP places: exactly 3 accepted", vipRuns.filter((r) => r.status === 201).length === 3 && vipRow.n === 6);
+  check("the rest are told VIP is full", vipRuns.filter((r) => r.data.error === "vip_full").length === 7);
+  check("normal tickets still available", (await register({ guestCount: 2 })).status === 201);
+  check("unknown ticket type rejected", (await register({ ticketType: "gold" })).status === 400);
 
   console.log("Cancellation frees places");
   await reset({ max_capacity: 4 });

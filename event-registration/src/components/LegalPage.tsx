@@ -16,7 +16,7 @@ export function LegalPage(props: { title: string; locale: Locale; t: Dict; s: Ev
             </svg>
             {props.t.backHome}
           </Link>
-          <LanguageSwitch locale={props.locale} label={props.t.switchTo} />
+          <LanguageSwitch locale={props.locale} label={props.t.language} />
         </div>
       </header>
       <Embroidery tiles={14} cell={3} className="bg-linen py-3" />

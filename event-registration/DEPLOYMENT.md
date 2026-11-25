@@ -111,8 +111,9 @@ Write them into a private note. Never post them in chats, emails or on GitHub.
 
 In the dashboard (`<your link>/admin`) → **Event settings**:
 
-1. **Registration:** maximum capacity (number of **people**), maximum people per registration, whether
-   a waiting list should open when full.
+1. **Registration:** maximum capacity (number of **people**), **VIP places** (part of the maximum;
+   0 hides the VIP option), optional short info for the normal ticket and the VIP place (e.g. price),
+   maximum people per registration, whether a waiting list should open when full.
 2. **Event:** name, short line under the name, date, start/end time, venue name and address, map link
    (optional: open the venue in Google Maps → **Share** → **Copy link**).
 3. **Page texts:** "About the evening", "What to expect" (one item per line), dress code, "Good to know".
@@ -121,7 +122,13 @@ In the dashboard (`<your link>/admin`) → **Event settings**:
    wa.me link; leave empty to hide it). For the legal fields see the [legal checklist](#part-6-legal-details-you-must-provide) below.
 5. Click **Save settings**, then open your link on your phone to check everything.
 
-All of this can be changed at any time without touching code.
+All of this can be changed at any time without touching code. The event texts are already filled in
+for 19 December 2026, 22:00, Crimmitschauer Str. 77, 08058 Zwickau (in German); check and adjust them.
+
+The website buttons and messages are available in German, English, Albanian, Bosnian, Croatian,
+Serbian and Turkish (menu with flags at the top). The event texts you type here are shown as written,
+in every language. Privacy notice and Impressum are shown in German, or in English for the other
+languages.
 
 ---
 

@@ -31,3 +31,14 @@ export function StatusBadge({ status }: { status: RegistrationStatus }) {
     </span>
   );
 }
+
+export function VipBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#fbefd6] px-2 py-0.5 text-xs font-semibold text-[#7a4d00]">
+      <svg viewBox="0 0 24 24" className="size-3" fill="currentColor" aria-hidden="true">
+        <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
+      </svg>
+      VIP
+    </span>
+  );
+}
