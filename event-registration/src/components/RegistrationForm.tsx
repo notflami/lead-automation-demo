@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { formatPrice } from "@/lib/format";
 import { dictionaries, type Locale } from "@/lib/i18n";
 
 export type FormMode = "open" | "waitlist" | "full" | "closed";
@@ -56,7 +57,7 @@ export function RegistrationForm(props: {
   siteUrl: string;
   /** Event WhatsApp number (E.164) or "" when not set. */
   whatsappNumber: string;
-  tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string };
+  tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string; priceNormal: number; priceVip: number };
 }) {
   const t = dictionaries[props.locale];
   const id = useId();
@@ -85,6 +86,8 @@ export function RegistrationForm(props: {
   const clearError = (f: FieldName) => setErrors((e) => (e[f] ? { ...e, [f]: undefined } : e));
 
   const max = Math.max(1, props.maxGuests);
+  const priceOf = (type: "normal" | "vip") => (type === "vip" ? props.tickets.priceVip : props.tickets.priceNormal);
+  const price = (cents: number) => formatPrice(cents, props.locale);
   const isWaitlist = props.mode === "waitlist" || waitlistOffer;
 
   function fieldMessage(code: string): string {
@@ -266,6 +269,14 @@ export function RegistrationForm(props: {
                     <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
                   </svg>
                   {t.ticketVip}
+                </dd>
+              </div>
+            )}
+            {!waitlisted && priceOf(confirmation.ticketType ?? "normal") > 0 && (
+              <div>
+                <dt className="text-base text-muted">{t.total}</dt>
+                <dd className="text-xl font-semibold tabular-nums">
+                  {price(priceOf(confirmation.ticketType ?? "normal") * confirmation.guestCount)}
                 </dd>
               </div>
             )}
@@ -463,7 +474,7 @@ export function RegistrationForm(props: {
                     }}
                     className="mt-1 size-5 shrink-0 accent-ink"
                   />
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-lg font-semibold">
                       {type === "vip" && (
                         <svg viewBox="0 0 24 24" className="size-5 text-saffron" fill="currentColor" aria-hidden="true">
@@ -472,6 +483,12 @@ export function RegistrationForm(props: {
                       )}
                       {type === "vip" ? t.ticketVip : t.ticketNormal}
                     </span>
+                    {priceOf(type) > 0 && (
+                      <span className="block text-base">
+                        <span className="font-semibold text-ink">{price(priceOf(type))}</span>{" "}
+                        <span className="text-muted">{t.perPerson}</span>
+                      </span>
+                    )}
                     {soldOut ? (
                       <span className="block text-base">{t.vipSoldOut}</span>
                     ) : (
@@ -494,6 +511,13 @@ export function RegistrationForm(props: {
         </label>
       </div>
 
+      {!props.tickets.vipEnabled && props.tickets.priceNormal > 0 && (
+        <p className="text-lg">
+          <span className="font-semibold">{t.ticketHeading}:</span> {price(props.tickets.priceNormal)}{" "}
+          <span className="text-muted">{t.perPerson}</span>
+        </p>
+      )}
+
       <p className="text-base leading-relaxed text-muted">
         {t.privacyBefore}
         <Link href="/privacy" target="_blank" className="font-semibold text-ink underline underline-offset-4">
@@ -508,10 +532,13 @@ export function RegistrationForm(props: {
           </>
         ) : isWaitlist ? (
           t.submitWaitlist
-        ) : ticket === "vip" ? (
-          t.submitVipPlaces(guests)
         ) : (
-          t.submitPlaces(guests)
+          <span className="text-center">
+            {ticket === "vip" ? t.submitVipPlaces(guests) : t.submitPlaces(guests)}
+            {!isWaitlist && priceOf(ticket) > 0 && (
+              <span className="font-medium whitespace-nowrap"> ({price(priceOf(ticket) * guests)})</span>
+            )}
+          </span>
         )}
       </button>
       <WhatsAppLink number={props.whatsappNumber} label={t.whatsappQuestion} message={`Hallo! Ich habe eine Frage zur Veranstaltung „${props.event.name}“${props.event.dateTextDe ? ` am ${props.event.dateTextDe}` : ""}.`} />

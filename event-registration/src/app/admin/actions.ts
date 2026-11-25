@@ -89,6 +89,11 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
   await requireAdmin();
   const raw: Record<string, unknown> = Object.fromEntries([...form.entries()].filter(([k]) => !k.startsWith("tr.")));
   raw.registration_open = form.get("registration_open") === "on";
+  const cents = (name: string) => Math.round(Number(String(form.get(name) ?? "0").replace(",", ".")) * 100);
+  raw.price_normal_cents = cents("price_normal_eur");
+  raw.price_vip_cents = cents("price_vip_eur");
+  delete raw.price_normal_eur;
+  delete raw.price_vip_eur;
   raw.waitlist_enabled = form.get("waitlist_enabled") === "on";
   const parsed = settingsSchema.safeParse(raw);
   if (!parsed.success) {

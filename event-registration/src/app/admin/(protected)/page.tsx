@@ -14,6 +14,8 @@ import { webhookHealth } from "@/lib/webhook";
 
 export const dynamic = "force-dynamic";
 
+const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+
 export default async function OverviewPage() {
   await requireAdmin();
   const [stats, activity, recent, hooks, s] = await Promise.all([
@@ -60,6 +62,15 @@ export default async function OverviewPage() {
 
       <section className="rounded-xl bg-white p-5">
         <CapacityMeter stats={stats} />
+        {(s.price_normal_cents > 0 || s.price_vip_cents > 0) && (
+          <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
+            Value of reserved tickets:{" "}
+            <span className="font-semibold text-ink tabular-nums">
+              {euro((stats.reservedPlaces - stats.vipReservedPlaces) * s.price_normal_cents + stats.vipReservedPlaces * s.price_vip_cents)}
+            </span>{" "}
+            ({stats.reservedPlaces - stats.vipReservedPlaces} × {euro(s.price_normal_cents)} normal, {stats.vipReservedPlaces} × {euro(s.price_vip_cents)} VIP). Not paid online yet.
+          </p>
+        )}
         {stats.vipCapacity > 0 && (
           <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
             VIP places: <span className="font-semibold text-ink tabular-nums">{stats.vipReservedPlaces}</span> of {stats.vipCapacity} reserved (

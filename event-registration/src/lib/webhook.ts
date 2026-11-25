@@ -6,7 +6,11 @@ import type { Registration } from "./types";
 
 export const MAX_WEBHOOK_ATTEMPTS = 10;
 
-export function buildPayload(r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "ticket_type" | "status" | "locale" | "created_at">, eventName: string) {
+export function buildPayload(
+  r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "ticket_type" | "status" | "locale" | "created_at">,
+  eventName: string,
+  prices: { normal: number; vip: number } = { normal: 0, vip: 0 },
+) {
   return {
     event: "new_registration",
     registration_id: r.reference,
@@ -14,6 +18,7 @@ export function buildPayload(r: Pick<Registration, "reference" | "full_name" | "
     phone: r.phone,
     guest_count: r.guest_count,
     ticket_type: r.ticket_type, // "normal" | "vip"
+    amount_eur: (r.guest_count * (r.ticket_type === "vip" ? prices.vip : prices.normal)) / 100, // ticket value, not yet paid
     status: r.status, // "confirmed" | "waitlisted"
     language: r.locale,
     event_name: eventName,
@@ -53,14 +58,14 @@ export async function deliverRegistrationWebhook(registrationId: string): Promis
   }
   return sql.begin(async (tx) => {
     // skip locked: if another worker is already delivering this row, do nothing (no double send).
-    const [row] = await tx<(Registration & { event_name: string })[]>`
-      select r.*, s.event_name from registrations r, event_settings s
+    const [row] = await tx<(Registration & { event_name: string; price_normal_cents: number; price_vip_cents: number })[]>`
+      select r.*, s.event_name, s.price_normal_cents, s.price_vip_cents from registrations r, event_settings s
       where r.id = ${registrationId} and s.id = 1 and r.webhook_status in ('pending', 'failed')
         and r.anonymized_at is null
       for update of r skip locked`;
     if (!row) return "busy" as const;
     try {
-      await postToWebhook(buildPayload(row, row.event_name));
+      await postToWebhook(buildPayload(row, row.event_name, { normal: row.price_normal_cents, vip: row.price_vip_cents }));
       await tx`update registrations set webhook_status = 'sent', webhook_sent_at = now(),
                  webhook_attempts = webhook_attempts + 1, webhook_last_error = null where id = ${registrationId}`;
       return "sent" as const;

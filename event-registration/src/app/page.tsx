@@ -116,6 +116,8 @@ export default async function HomePage() {
                   vipAvailable: places.vip,
                   normalInfo: s.ticket_normal_info,
                   vipInfo: s.ticket_vip_info,
+                  priceNormal: s.price_normal_cents,
+                  priceVip: s.price_vip_cents,
                 }}
                 event={{
                   name: s.event_name,
