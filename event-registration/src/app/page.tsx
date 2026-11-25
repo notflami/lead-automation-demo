@@ -60,6 +60,7 @@ export default async function HomePage() {
                   </span>
                 </p>
               )}
+              {s.min_age > 0 && <AgeNotice text={t.ageNotice(s.min_age)} age={s.min_age} className="mt-2 md:hidden" />}
               {showScarcity && <p className="mt-3 text-lg font-medium text-saffron-light">{t.placesLeft(remaining)}</p>}
 
               {/* Desktop date composition: the day numeral as the anchor. */}
@@ -84,6 +85,7 @@ export default async function HomePage() {
                       </span>
                     </p>
                   )}
+                  {s.min_age > 0 && <AgeNotice text={t.ageNotice(s.min_age)} age={s.min_age} className="mt-3" />}
                 </div>
               )}
             </div>
@@ -212,6 +214,18 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
       <dt className="text-base font-medium text-muted">{label}</dt>
       <dd className="text-xl text-ink">{value}</dd>
     </div>
+  );
+}
+
+/** Quiet age notice: same muted tone as the address, small outlined "18+" mark. */
+function AgeNotice({ text, age, className = "" }: { text: string; age: number; className?: string }) {
+  return (
+    <p className={`flex items-center gap-2 text-base text-linen/70 ${className}`}>
+      <span aria-hidden="true" className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-linen/40 px-1.5 text-[0.7rem] font-semibold leading-none tracking-tight">
+        {age}+
+      </span>
+      {text}
+    </p>
   );
 }
 

@@ -231,3 +231,8 @@ begin
   end loop;
 end $$;
 insert into schema_migrations (name) values ('006_text_translations.sql') on conflict do nothing;
+
+-- ===== 007_min_age.sql =====
+-- Minimum age shown as a small notice at the top of the event page (0 = no notice).
+alter table event_settings add column if not exists min_age integer not null default 18 check (min_age between 0 and 99);
+insert into schema_migrations (name) values ('007_min_age.sql') on conflict do nothing;

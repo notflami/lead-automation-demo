@@ -33,6 +33,7 @@ export interface EventSettings {
   ticket_normal_info: string;
   ticket_vip_info: string;
   max_guests_per_registration: number;
+  min_age: number;
   low_capacity_threshold: number;
   registration_open: boolean;
   waitlist_enabled: boolean;
