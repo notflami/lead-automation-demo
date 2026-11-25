@@ -72,6 +72,9 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         <Field label="VIP place: short info" hint="Optional, shown under the option.">
           <input name="ticket_vip_info" defaultValue={v.ticket_vip_info} maxLength={200} className={input} />
         </Field>
+        <Field label="Minimum age" hint="Shown as a small notice at the top of the page (e.g. 18). 0 hides it.">
+          <input name="min_age" type="number" min={0} max={99} defaultValue={v.min_age} required className={input} />
+        </Field>
         <Field label="Maximum people per registration" hint="Larger groups must contact you.">
           <input name="max_guests_per_registration" type="number" min={1} max={50} defaultValue={v.max_guests_per_registration} required className={input} />
         </Field>

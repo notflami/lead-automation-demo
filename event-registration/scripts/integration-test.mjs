@@ -213,6 +213,14 @@ try {
   check("German page and untranslated language show German", dePage.includes("Deutscher Untertitel") && trPage.includes("Deutscher Untertitel"));
   await sql`update event_settings set translations = '{}'::jsonb where id = 1`;
 
+  console.log("Age notice");
+  await sql`update event_settings set min_age = 18 where id = 1`;
+  check("18+ notice shown (German default)", (await fetch(BASE + "/").then((r) => r.text())).includes("Einlass ab 18 Jahren"));
+  check("18+ notice translated", (await fetch(BASE + "/", { headers: { Cookie: "lang=tr" } }).then((r) => r.text())).includes("18 yaş ve üzeri katılabilir"));
+  await sql`update event_settings set min_age = 0 where id = 1`;
+  check("min age 0 hides the notice", !(await fetch(BASE + "/").then((r) => r.text())).includes("Einlass ab"));
+  await sql`update event_settings set min_age = 18 where id = 1`;
+
   console.log("Public pages");
   for (const p of ["/", "/privacy", "/imprint", "/api/calendar"]) check(`GET ${p} → 200`, (await fetch(BASE + p)).status === 200);
   const ics = await fetch(BASE + "/api/calendar").then((r) => r.text());
