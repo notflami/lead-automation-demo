@@ -3,13 +3,14 @@ import "@fontsource/yeseva-one/latin-400.css";
 import "@fontsource/yeseva-one/latin-ext-400.css";
 import "@fontsource-variable/commissioner/wght.css";
 import "./globals.css";
+import { siteUrl } from "@/lib/env";
 import { getLocale } from "@/lib/locale";
 import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const base = process.env.PUBLIC_SITE_URL || "http://localhost:3000";
+  const base = siteUrl();
   try {
     const s = await getSettings();
     const description = s.tagline || s.about_text.slice(0, 160);

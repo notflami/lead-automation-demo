@@ -21,7 +21,15 @@ export const env = {
   webhookUrl: () => process.env.N8N_WEBHOOK_URL || "",
   webhookSecret: () => process.env.N8N_WEBHOOK_SECRET || "",
   cronSecret: () => process.env.CRON_SECRET || "",
-  siteUrl: () => (process.env.PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+  siteUrl: () => siteUrl(),
   defaultCountryCode: () => (process.env.DEFAULT_PHONE_COUNTRY_CODE || "49").replace(/\D/g, ""),
   timeZone: () => process.env.EVENT_TIMEZONE || "Europe/Berlin",
 };
+
+/** Public URL: PUBLIC_SITE_URL, else the Vercel production domain (set automatically by Vercel), else localhost. */
+export function siteUrl(): string {
+  const explicit = process.env.PUBLIC_SITE_URL;
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const url = explicit || (vercel ? `https://${vercel}` : "http://localhost:3000");
+  return url.replace(/\/$/, "");
+}

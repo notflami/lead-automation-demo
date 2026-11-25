@@ -18,6 +18,10 @@ const csp = [
 const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // The share-preview image reads the display font from disk at runtime.
+  outputFileTracingIncludes: {
+    "/opengraph-image": ["./node_modules/@fontsource/yeseva-one/files/*.woff"],
+  },
   async headers() {
     return [
       {

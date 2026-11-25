@@ -13,6 +13,45 @@ registration is pushed to **n8n**.
 
 ---
 
+## Go live without coding (about 15 minutes)
+
+You need: this repository on GitHub, a free **Supabase** account (database) and a free **Vercel**
+account (website). No terminal needed.
+
+**A. Database: Supabase**
+1. supabase.com → sign up → **New project**. Name it, set a database password (save it!), region
+   **Central EU (Frankfurt)** → Create. Wait ~2 minutes.
+2. Left menu **SQL Editor** → **New query** → paste the whole content of
+   [`db/supabase-setup.sql`](db/supabase-setup.sql) → **Run**. It should say "Success".
+3. Top bar **Connect** → section **Transaction pooler** → copy the URI
+   (`postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`).
+   Replace `[YOUR-PASSWORD]` with the database password from step 1. This is your `DATABASE_URL`.
+
+**B. Website: Vercel**
+1. vercel.com → **Sign up with GitHub** → **Add New… → Project** → import `lead-automation-demo`.
+2. **Root Directory** → Edit → choose `event-registration`.
+3. Open **Environment Variables** and add three:
+   | Name | Value |
+   |---|---|
+   | `DATABASE_URL` | the URI from A3 |
+   | `ADMIN_PASSWORD` | the password organizers will use for `/admin` (long!) |
+   | `SESSION_SECRET` | any random text of 40+ characters (e.g. from a password generator) |
+4. **Deploy**. After ~1 minute you get a link like `https://lead-automation-demo.vercel.app`.
+5. Project **Settings → Functions → Function Region** → Frankfurt (`fra1`) → Save, then
+   **Deployments → ⋯ → Redeploy** (keeps guest data in the EU).
+
+**C. Fill in your event**
+1. Open `https://<your-link>/admin`, sign in with `ADMIN_PASSWORD`.
+2. **Event settings**: name, date, time, venue, texts, capacity, organizer address (Impressum), contact → Save.
+3. Make a test reservation on your phone, check it in the dashboard, then cancel it there.
+4. Share the link / make the QR code. Optional: own domain under Vercel **Settings → Domains**;
+   n8n: add `N8N_WEBHOOK_URL` + `N8N_WEBHOOK_SECRET` (see [Connect n8n](#connect-n8n)) and redeploy.
+
+Vercel builds from the repository's **main** branch. Merge this work into `main` first, or set
+**Settings → Git → Production Branch** to the branch that contains it.
+
+---
+
 ## Contents
 
 1. [How it works](#how-it-works)
@@ -81,7 +120,7 @@ See [`.env.example`](.env.example). Only the server reads these; nothing secret 
 | `DATABASE_URL` | yes | PostgreSQL connection string |
 | `SESSION_SECRET` | yes | ≥ 32 random characters (`openssl rand -base64 48`) |
 | `ADMIN_PASSWORD` | yes | Dashboard password — use a long passphrase |
-| `PUBLIC_SITE_URL` | yes in prod | e.g. `https://balkan-night.de` (share links, calendar, preview image) |
+| `PUBLIC_SITE_URL` | no | e.g. `https://balkan-night.de`. On Vercel the project domain is used automatically; set this when you add your own domain |
 | `N8N_WEBHOOK_URL` | no | n8n Webhook node **production** URL; empty = disabled |
 | `N8N_WEBHOOK_SECRET` | recommended | Sent as `X-Webhook-Secret` and used for the HMAC signature |
 | `CRON_SECRET` | recommended | Protects `/api/cron` (Vercel sends it automatically) |
