@@ -128,8 +128,8 @@ try {
   check("forged form token → 401 with fresh token", forged.status === 401 && typeof forged.data.formToken === "string");
   await reset({ max_capacity: 1000 });
   const rl = [];
-  for (let i = 0; i < 12; i++) rl.push((await register({}, { ip: "203.0.113.7" })).status);
-  check("rate limit after 10 attempts per IP", rl.slice(0, 10).every((s) => s === 201) && rl.slice(10).every((s) => s === 429), rl.join(","));
+  for (let i = 0; i < 32; i++) rl.push((await register({}, { ip: "203.0.113.7" })).status);
+  check("rate limit after 30 attempts per IP", rl.slice(0, 30).every((s) => s === 201) && rl.slice(30).every((s) => s === 429), rl.join(","));
 
   console.log("n8n webhook");
   await reset();
@@ -151,6 +151,51 @@ try {
   const [row2] = await sql`select webhook_status from registrations where reference = ${reg2.data.registration.reference}`;
   check("cron retry delivers the failed webhook", cron.webhooks?.sent >= 1 && row2.webhook_status === "sent", JSON.stringify(cron));
 
+  console.log("Cancellation frees places");
+  await reset({ max_capacity: 4 });
+  const c1 = await register({ guestCount: 4, phone: "0176 1112223" });
+  check("event full after 4 places", (await register({ guestCount: 1 })).data.error === "full");
+  await sql`update registrations set status = 'cancelled', cancelled_at = now() where reference = ${c1.data.registration.reference}`;
+  const again = await register({ guestCount: 2, phone: "0176 1112223" });
+  check("same phone can register again after cancellation, freed places reusable", again.status === 201);
+
+  console.log("Admin protection");
+  const adminKey = new TextEncoder().encode(process.env.SESSION_SECRET);
+  const wrongKey = new TextEncoder().encode("x".repeat(48));
+  const forgedSession = await new SignJWT({ role: "admin" }).setProtectedHeader({ alg: "HS256" }).setAudience("event-admin").setExpirationTime("1h").sign(wrongKey);
+  const expired = await new SignJWT({ role: "admin" }).setProtectedHeader({ alg: "HS256" }).setAudience("event-admin").setIssuedAt(Math.floor(Date.now() / 1000) - 7200).setExpirationTime(Math.floor(Date.now() / 1000) - 3600).sign(adminKey);
+  const unsigned = Buffer.from('{"alg":"none"}').toString("base64url") + "." + Buffer.from('{"role":"admin","aud":"event-admin"}').toString("base64url") + ".";
+  const valid = await new SignJWT({ role: "admin" }).setProtectedHeader({ alg: "HS256" }).setAudience("event-admin").setExpirationTime("1h").sign(adminKey);
+  const asCookie = (t) => ({ headers: { Cookie: `admin_session=${t}` }, redirect: "manual" });
+  for (const [name, t] of [["forged signature", forgedSession], ["expired session", expired], ["unsigned token", unsigned]]) {
+    const pageRes = await fetch(BASE + "/admin/registrations", asCookie(t));
+    const csvRes = await fetch(BASE + "/api/admin/export", asCookie(t));
+    check(`${name}: dashboard redirects to login, CSV refused`, pageRes.status === 307 && csvRes.status === 401);
+  }
+  check("valid session can open dashboard", (await fetch(BASE + "/admin/registrations", asCookie(valid))).status === 200);
+  const csvBytes = Buffer.from(await fetch(BASE + "/api/admin/export", asCookie(valid)).then((r) => r.arrayBuffer()));
+  const csv = csvBytes.toString("utf8");
+  check("CSV has Excel BOM and contains the registration with phone unchanged", csvBytes.subarray(0, 3).toString("hex") === "efbbbf" && csv.includes('"+491761112223"'));
+  const home = await fetch(BASE + "/").then((r) => r.text());
+  check("public page shows no guest names or phone numbers", !home.includes("1761112223") && !home.includes("Test Guest"));
+
+  console.log("GDPR: automatic anonymisation");
+  await sql`update event_settings set event_date = current_date - 40, data_retention_days = 30 where id = 1`;
+  const before = await reserved();
+  const cronRes = await fetch(`${BASE}/api/cron`, { headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` } }).then((r) => r.json());
+  const [left] = await sql`select count(*) filter (where anonymized_at is null)::int as personal,
+                                  count(*) filter (where full_name <> 'Anonymised' or email is not null)::int as named
+                           from registrations`;
+  check("cron anonymises all personal data after the retention period", cronRes.anonymised >= 1 && left.personal === 0 && left.named === 0, JSON.stringify(cronRes));
+  check("guest totals are kept after anonymisation", (await reserved()) === before);
+  await sql`update event_settings set event_date = current_date + 21 where id = 1`;
+
+  console.log("Legal pages");
+  await sql`update event_settings set organizer_name = 'Test Verein e.V.', organizer_address = 'Teststraße 1, 10115 Berlin', contact_email = 'kontakt@example.org' where id = 1`;
+  const [priv, imp] = await Promise.all([fetch(BASE + "/privacy").then((r) => r.text()), fetch(BASE + "/imprint").then((r) => r.text())]);
+  check("privacy notice names the organizer and retention period", priv.includes("Test Verein e.V.") && priv.includes("30"));
+  check("Impressum shows organizer, address and contact", imp.includes("Test Verein e.V.") && imp.includes("Teststraße 1") && imp.includes("kontakt@example.org"));
+
   console.log("Public pages");
   for (const p of ["/", "/privacy", "/imprint", "/api/calendar"]) check(`GET ${p} → 200`, (await fetch(BASE + p)).status === 200);
   const ics = await fetch(BASE + "/api/calendar").then((r) => r.text());
@@ -158,7 +203,8 @@ try {
   check("admin redirects to login when signed out", (await fetch(BASE + "/admin", { redirect: "manual" })).status === 307);
 } finally {
   await reset();
-  await sql`update event_settings set max_capacity = 250, waitlist_enabled = true where id = 1`;
+  await sql`update event_settings set max_capacity = 250, waitlist_enabled = true, data_retention_days = 30,
+            event_date = current_date + 21 where id = 1`;
   await sql.end();
   mock.close();
   console.log(`\n${passed} passed, ${failed} failed`);

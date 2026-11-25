@@ -22,6 +22,9 @@ export async function loginAction(_: ActionState, form: FormData): Promise<Actio
   if (!(await rateLimit("login", ip, 8, 15 * 60))) {
     return { error: "Too many sign-in attempts. Wait 15 minutes and try again." };
   }
+  if (!process.env.ADMIN_PASSWORD) {
+    return { error: "Sign-in is not set up: the ADMIN_PASSWORD setting is missing on the server." };
+  }
   const password = String(form.get("password") || "");
   if (!password || !safeEqual(password, env.adminPassword)) {
     return { error: "That password is not correct." };

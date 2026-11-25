@@ -76,6 +76,9 @@ export function RegistrationForm(props: {
     if (stored) setConfirmation(stored);
   }, [props.event.name]);
 
+  // Remove a field's error as soon as the visitor corrects it, so stale red text never lingers.
+  const clearError = (f: FieldName) => setErrors((e) => (e[f] ? { ...e, [f]: undefined } : e));
+
   const max = Math.max(1, props.maxGuests);
   const isWaitlist = props.mode === "waitlist" || waitlistOffer;
 
@@ -279,7 +282,7 @@ export function RegistrationForm(props: {
             {t.shareWhatsApp}
           </a>
         </div>
-        <button type="button" onClick={reset} className="mt-6 text-base font-medium text-muted underline underline-offset-4 hover:text-ink">
+        <button type="button" onClick={reset} className="mt-4 inline-flex min-h-11 items-center text-base font-medium text-muted underline underline-offset-4 hover:text-ink">
           {t.newReservation}
         </button>
       </div>
@@ -330,7 +333,10 @@ export function RegistrationForm(props: {
           enterKeyHint="next"
           maxLength={120}
           value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
+          onChange={(e) => {
+            setFullName(e.target.value);
+            clearError("fullName");
+          }}
           aria-invalid={err("fullName") ? true : undefined}
           aria-describedby={describedBy("fullName", true)}
           required
@@ -356,7 +362,10 @@ export function RegistrationForm(props: {
           className="field-input"
           placeholder="0176 1234567"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            clearError("phone");
+          }}
           aria-invalid={err("phone") ? true : undefined}
           aria-describedby={describedBy("phone", true)}
           required
@@ -370,7 +379,10 @@ export function RegistrationForm(props: {
           {t.guestsHint}
         </p>
         <div className="flex items-center gap-4">
-          <StepButton label={t.fewer} disabled={guests <= 1} onClick={() => setGuests((g) => Math.max(1, g - 1))}>
+          <StepButton label={t.fewer} disabled={guests <= 1} onClick={() => {
+              setGuests((g) => Math.max(1, g - 1));
+              clearError("guestCount");
+            }}>
             <path d="M5 12h14" />
           </StepButton>
           <output
@@ -385,7 +397,12 @@ export function RegistrationForm(props: {
             <path d="M12 5v14M5 12h14" />
           </StepButton>
         </div>
-        {err("guestCount") && <FieldError id={`${id}-guestCount-err`} text={err("guestCount")!} />}
+        {err("guestCount") ? (
+          <FieldError id={`${id}-guestCount-err`} text={err("guestCount")!} />
+        ) : (
+          guests >= max &&
+          max > 1 && <p className="mt-2 text-base text-muted">{t.errors.guests_too_many(max)}</p>
+        )}
       </fieldset>
 
       <div>
@@ -405,7 +422,10 @@ export function RegistrationForm(props: {
           maxLength={254}
           className="field-input"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clearError("email");
+          }}
           aria-invalid={err("email") ? true : undefined}
           aria-describedby={describedBy("email", true)}
         />
@@ -425,7 +445,10 @@ export function RegistrationForm(props: {
           <input
             type="checkbox"
             checked={privacy}
-            onChange={(e) => setPrivacy(e.target.checked)}
+            onChange={(e) => {
+              setPrivacy(e.target.checked);
+              clearError("privacyAccepted");
+            }}
             className="mt-0.5 size-7 shrink-0 cursor-pointer accent-ink"
             aria-invalid={err("privacyAccepted") ? true : undefined}
             aria-describedby={err("privacyAccepted") ? `${id}-privacyAccepted-err` : undefined}

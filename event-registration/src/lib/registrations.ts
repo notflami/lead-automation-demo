@@ -113,7 +113,10 @@ export async function getRemainingPlaces(maxCapacity: number): Promise<number> {
 export async function listRegistrations(opts: { q?: string; status?: string; limit?: number }): Promise<Registration[]> {
   const sql = db();
   const q = (opts.q || "").trim();
-  const digits = q.replace(/\D/g, "");
+  // Phone search: digits without the leading 0/00 prefix ("0176 123" → "176123").
+  // A registration number ("REG-000042") must not be treated as phone digits.
+  const isReference = /^reg[-\s]?\d*$/i.test(q);
+  const phoneDigits = isReference ? "" : q.replace(/\D/g, "").replace(/^0+/, "");
   const status = opts.status && opts.status !== "all" ? opts.status : null;
   return sql.unsafe<Registration[]>(
     `select ${REG_COLUMNS} from registrations
@@ -123,7 +126,7 @@ export async function listRegistrations(opts: { q?: string; status?: string; lim
             or ($3::text <> '' and regexp_replace(phone, '\\D', '', 'g') like '%' || $3 || '%'))
      order by created_at desc
      limit $4`,
-    [status, q.replace(/[%_\\]/g, "\\$&"), digits.length >= 3 ? digits.replace(/^0+/, "") : "", opts.limit ?? 2000],
+    [status, q.replace(/[%_\\]/g, "\\$&"), phoneDigits.length >= 4 ? phoneDigits : "", opts.limit ?? 2000],
   );
 }
 

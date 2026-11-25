@@ -5,6 +5,7 @@ import { ActivityChart } from "@/components/admin/ActivityChart";
 import { CapacityMeter } from "@/components/admin/CapacityMeter";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { requireAdmin } from "@/lib/auth";
+import { env } from "@/lib/env";
 import { formatDateTime } from "@/lib/format";
 import { dailyActivity, getStats, recentRegistrations } from "@/lib/registrations";
 import { getSettings } from "@/lib/settings";
@@ -136,6 +137,18 @@ export default async function OverviewPage() {
           </div>
         )}
         <p className="mt-2 text-sm text-muted">Failed deliveries never lose a registration. They are retried automatically.</p>
+        {hooks.configured && !env.webhookSecret() && (
+          <p role="alert" className="mt-3 rounded-lg border-l-4 border-kilim bg-kilim/8 px-3 py-2 text-sm text-kilim-dark">
+            The <code>N8N_WEBHOOK_SECRET</code> setting is missing. If your n8n Webhook node checks a secret (recommended), every delivery
+            is rejected; if it doesn&apos;t, anyone who finds the n8n address can send it fake registrations.
+          </p>
+        )}
+        {!env.cronSecret() && (
+          <p role="alert" className="mt-3 rounded-lg border-l-4 border-kilim bg-kilim/8 px-3 py-2 text-sm text-kilim-dark">
+            Daily maintenance is not set up: the <code>CRON_SECRET</code> setting is missing. Without it, failed n8n deliveries are only
+            retried by hand and personal data is <strong>not</strong> deleted automatically after the event.
+          </p>
+        )}
       </section>
     </div>
   );

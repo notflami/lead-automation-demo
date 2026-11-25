@@ -118,8 +118,8 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         <Field label="Organizer name">
           <input name="organizer_name" defaultValue={v.organizer_name} maxLength={200} className={input} />
         </Field>
-        <Field label="Organizer postal address" hint="Required for the Impressum.">
-          <textarea name="organizer_address" defaultValue={v.organizer_address} rows={2} maxLength={500} className={`${input} min-h-16`} />
+        <Field label="Organizer postal address" hint="Required for the Impressum. No P.O. box. For a registered association (e.V.) add: represented by (board members), register court and number.">
+          <textarea name="organizer_address" defaultValue={v.organizer_address} rows={4} maxLength={500} className={`${input} min-h-16`} />
         </Field>
         <Field label="Contact email">
           <input name="contact_email" type="email" defaultValue={v.contact_email} className={input} />

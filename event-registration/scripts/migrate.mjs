@@ -17,7 +17,10 @@ if (!url) {
   process.exit(1);
 }
 
-const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {} });
+// Same rule as src/lib/db.ts: TLS for remote databases unless ?sslmode= is given.
+const host = (() => { try { return new URL(url).hostname; } catch { return ""; } })();
+const ssl = /[?&]sslmode=/i.test(url) ? undefined : ["localhost", "127.0.0.1", "::1", "db", "postgres"].includes(host) ? false : "require";
+const sql = postgres(url, { max: 1, prepare: false, onnotice: () => {}, ssl });
 const dir = path.join(root, "db", "migrations");
 
 try {

@@ -13,42 +13,11 @@ registration is pushed to **n8n**.
 
 ---
 
-## Go live without coding (about 15 minutes)
+## Go live
 
-You need: this repository on GitHub, a free **Supabase** account (database) and a free **Vercel**
-account (website). No terminal needed.
-
-**A. Database: Supabase**
-1. supabase.com → sign up → **New project**. Name it, set a database password (save it!), region
-   **Central EU (Frankfurt)** → Create. Wait ~2 minutes.
-2. Left menu **SQL Editor** → **New query** → paste the whole content of
-   [`db/supabase-setup.sql`](db/supabase-setup.sql) → **Run**. It should say "Success".
-3. Top bar **Connect** → section **Transaction pooler** → copy the URI
-   (`postgresql://postgres.xxxx:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`).
-   Replace `[YOUR-PASSWORD]` with the database password from step 1. This is your `DATABASE_URL`.
-
-**B. Website: Vercel**
-1. vercel.com → **Sign up with GitHub** → **Add New… → Project** → import `lead-automation-demo`.
-2. **Root Directory** → Edit → choose `event-registration`.
-3. Open **Environment Variables** and add three:
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | the URI from A3 |
-   | `ADMIN_PASSWORD` | the password organizers will use for `/admin` (long!) |
-   | `SESSION_SECRET` | any random text of 40+ characters (e.g. from a password generator) |
-4. **Deploy**. After ~1 minute you get a link like `https://lead-automation-demo.vercel.app`.
-5. Project **Settings → Functions → Function Region** → Frankfurt (`fra1`) → Save, then
-   **Deployments → ⋯ → Redeploy** (keeps guest data in the EU).
-
-**C. Fill in your event**
-1. Open `https://<your-link>/admin`, sign in with `ADMIN_PASSWORD`.
-2. **Event settings**: name, date, time, venue, texts, capacity, organizer address (Impressum), contact → Save.
-3. Make a test reservation on your phone, check it in the dashboard, then cancel it there.
-4. Share the link / make the QR code. Optional: own domain under Vercel **Settings → Domains**;
-   n8n: add `N8N_WEBHOOK_URL` + `N8N_WEBHOOK_SECRET` (see [Connect n8n](#connect-n8n)) and redeploy.
-
-Vercel builds from the repository's **main** branch. Merge this work into `main` first, or set
-**Settings → Git → Production Branch** to the branch that contains it.
+**Follow [DEPLOYMENT.md](DEPLOYMENT.md).** It is a complete step-by-step guide written for
+non-programmers: Supabase database, Vercel website, all settings (mandatory vs. optional), n8n
+connection, final tests and the legal details you must provide.
 
 ---
 
@@ -115,8 +84,22 @@ docker run -d --name eventdb -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:16-a
 
 See [`.env.example`](.env.example). Only the server reads these; nothing secret reaches the browser.
 
-| Variable | Required | Purpose |
+| Variable | Required | Purpose / effect when missing |
 |---|---|---|
+| `DATABASE_URL` | **yes** | PostgreSQL connection string. Missing: nothing works |
+| `SESSION_SECRET` | **yes** | ≥ 32 random characters. Signs admin sessions and form tokens. Missing: pages fail |
+| `ADMIN_PASSWORD` | **yes** | Dashboard password. Missing: nobody can sign in |
+| `CRON_SECRET` | **yes in production** | Protects `/api/cron`; Vercel Cron sends it automatically. Missing: no automatic GDPR deletion, no scheduled webhook retries (dashboard warns) |
+| `N8N_WEBHOOK_URL` | for n8n | n8n Webhook node **Production URL**. Missing: no webhooks (registrations still saved) |
+| `N8N_WEBHOOK_SECRET` | with `N8N_WEBHOOK_URL` | Sent as `X-Webhook-Secret` + HMAC signature. Missing: n8n rejects deliveries or webhook is unprotected (dashboard warns) |
+| `PUBLIC_SITE_URL` | no | e.g. `https://balkan-night.de`. On Vercel the project domain is used automatically; set it for your own domain |
+| `DEFAULT_PHONE_COUNTRY_CODE` | no | Default `49`; used for local numbers like `0176 …` |
+| `EVENT_TIMEZONE` | no | Default `Europe/Berlin` |
+| `DATABASE_POOL_MAX` | no | Default `5` |
+
+Remote databases are connected with TLS unless the URL contains `?sslmode=…`.
+
+---|---|---|
 | `DATABASE_URL` | yes | PostgreSQL connection string |
 | `SESSION_SECRET` | yes | ≥ 32 random characters (`openssl rand -base64 48`) |
 | `ADMIN_PASSWORD` | yes | Dashboard password — use a long passphrase |
@@ -144,39 +127,23 @@ tracked in `schema_migrations`).
 Capacity used = sum of `guest_count` for `confirmed` + `checked_in`. Waiting-list and cancelled
 registrations don't take places.
 
-To add a change later: create `db/migrations/003_something.sql` and run `npm run db:migrate`.
+To add a change later: create the next numbered file in `db/migrations/`, run `npm run db:migrate`, and
+regenerate `db/supabase-setup.sql` (a unit test fails if it is out of sync).
 
 ---
 
 ## Deploy (recommended: Vercel + Supabase)
 
-Fastest reliable path: about 20 minutes, free tiers are enough for 300 guests.
+Step-by-step instructions: [DEPLOYMENT.md](DEPLOYMENT.md). Technical summary:
 
-**1. Database (Supabase)**
-1. Create a project at supabase.com. Choose region **Frankfurt (eu-central-1)** for GDPR.
-2. Project → **Connect** → copy the **Transaction pooler** connection string (port `6543`) and insert your DB password.
-3. From your computer: `DATABASE_URL="<that string>" npm run db:migrate`.
-
-   (Any PostgreSQL works the same way: Neon, Railway, your own server.)
-
-**2. App (Vercel)**
-1. Push this repository to GitHub, then on vercel.com → **Add New Project** → import it.
-2. **Root Directory:** `event-registration`. Framework is detected automatically.
-3. Add the environment variables from the table above (Production). Generate secrets with `openssl rand -base64 48`.
-4. Deploy. Under **Settings → Functions** pick the Frankfurt region (`fra1`) to keep data in the EU.
-5. Add your domain under **Settings → Domains**, then set `PUBLIC_SITE_URL` to it and redeploy.
-
-**3. After the first deploy**
-1. Open `https://your-domain/admin`, sign in, fill in **Event settings** (name, date, venue, texts,
-   capacity, organizer address for the Impressum, contact).
-2. Make one test registration, check that it shows in the dashboard and in n8n, then cancel it.
-3. Generate the QR code for flyers from the final domain (any QR generator; use high error correction).
-4. Test the link preview by pasting the URL into a WhatsApp chat.
-
-**Cron:** [`vercel.json`](vercel.json) calls `/api/cron` daily (Vercel Hobby limit). It retries failed
-webhooks and runs the GDPR auto-deletion. Webhooks are also retried after every new registration and
-via "Retry now" in the dashboard. For more frequent retries, add an n8n **Schedule Trigger** → HTTP
-Request `GET https://your-domain/api/cron` with header `Authorization: Bearer <CRON_SECRET>`.
+- Database: run [`db/supabase-setup.sql`](db/supabase-setup.sql) in the Supabase SQL editor (or
+  `npm run db:migrate` with `DATABASE_URL` set). Use the **transaction pooler** URL (port 6543) on Vercel.
+- Vercel: Root Directory `event-registration`, set the env vars above, function region `fra1`.
+- [`vercel.json`](vercel.json) calls `/api/cron` daily (Vercel Hobby limit): webhook retries, GDPR
+  auto-deletion, rate-limit cleanup. Webhooks are also retried after each successful delivery and via
+  "Retry now". For more frequent retries add an n8n **Schedule Trigger** → HTTP Request
+  `GET https://your-domain/api/cron` with header `Authorization: Bearer <CRON_SECRET>`.
+- Any PostgreSQL 13+ works (Neon, Railway, own server).
 
 ---
 
@@ -202,17 +169,10 @@ limiting uses them). Schedule the maintenance job, e.g. hourly:
 
 ## Connect n8n
 
-1. In n8n, import [`n8n/new-registration-workflow.json`](n8n/new-registration-workflow.json)
-   (Workflows → Import from file). It contains:
-   - **Webhook** `POST /webhook/new-registration` with *Header Auth*
-   - **Telegram** message to the organizers for every registration
-   - **Gmail** confirmation to the guest, only if they gave an email (EN/DE)
-2. Create a **Header Auth** credential: Name `X-Webhook-Secret`, Value = your `N8N_WEBHOOK_SECRET`.
-   Attach it to the Webhook node. Connect your Telegram/Gmail credentials and set the Telegram chat ID.
-   Remove nodes you don't need.
-3. **Activate** the workflow and copy the Webhook node's **Production URL** into `N8N_WEBHOOK_URL`
-   (redeploy on Vercel after changing env vars).
-4. Register once on the site → the dashboard Overview shows "1 delivered".
+Setup steps (import, secret, Telegram, Gmail, activation, troubleshooting): **[DEPLOYMENT.md, Part 4](DEPLOYMENT.md#part-4-connect-your-n8n-15-minutes)**.
+The workflow [`n8n/new-registration-workflow.json`](n8n/new-registration-workflow.json) was verified by
+importing it into n8n 2.47 and running it with real registrations from the app (secret check, EN/DE
+messages, email branch).
 
 Request sent for each new registration:
 
@@ -287,16 +247,18 @@ What **you** need to do:
 ## Tests
 
 ```bash
-npm test                                   # unit tests: capacity rules, phone normalisation, validation
+npm test                                   # unit tests: capacity rules, phone numbers, validation, setup SQL in sync
 npm run build && npm start                 # then, against a DISPOSABLE local database:
 npm run test:integration -- --yes-wipe-database
 ```
 
-The integration suite (29 checks) runs against the real server and database: 40 simultaneous
+The integration suite (41 checks) runs against the real server and database: 40 simultaneous
 registrations against capacity 20 (exactly 10 accepted, no overbooking), partial availability,
-waiting list consent, closed registration, double submit, duplicate phone, validation, honeypot,
+waiting list consent, closed registration, double submit, duplicate phone, re-registration after
+cancellation, validation, honeypot,
 fill-time check, forged token, rate limiting, webhook payload + signature, registration kept when n8n
-fails and delivered by the cron retry, public pages, calendar file and admin protection.
+fails and delivered by the cron retry, forged/expired/unsigned admin sessions, CSV export, no guest
+data on public pages, automatic anonymisation, legal pages, calendar file and admin protection.
 
 ---
 

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (token === "invalid") return json({ ok: false, error: "form_expired", formToken: await issueFormToken() }, 401);
     if (token === "too_fast") return json({ ok: false, error: "too_fast", retryAfterMs: MIN_FILL_SECONDS * 1000 }, 425);
 
-    if (!(await rateLimit("register", clientIp(req.headers), 10, 10 * 60))) {
+    if (!(await rateLimit("register", clientIp(req.headers), 30, 10 * 60))) {
       return json({ ok: false, error: "rate_limited" }, 429);
     }
 
@@ -59,8 +59,8 @@ export async function POST(req: NextRequest) {
     // 5. n8n webhook — runs after the response is sent; failures are recorded and retried.
     if (!result.duplicate) {
       after(async () => {
-        await deliverRegistrationWebhook(r.id);
-        await retryPendingWebhooks(5);
+        // Retry older failed deliveries only when n8n just proved reachable.
+        if ((await deliverRegistrationWebhook(r.id)) === "sent") await retryPendingWebhooks(5);
       });
     }
 

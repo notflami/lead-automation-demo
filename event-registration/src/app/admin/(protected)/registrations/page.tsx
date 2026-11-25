@@ -86,7 +86,7 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
                     <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{r.guest_count}</td>
                     <td className="px-4 py-2.5 whitespace-nowrap text-muted">{formatDateTime(r.created_at)}</td>
                     <td className="px-4 py-2.5">
-                      <StatusSelect id={r.id} status={r.status} label={r.full_name} />
+                      <StatusSelect id={r.id} status={r.status} label={`${r.full_name} (${r.reference})`} />
                     </td>
                     <td className="px-4 py-2.5 text-right">
                       <Link href={`/admin/registrations/${r.id}`} className="text-sm font-semibold text-[#3d4bb8] underline-offset-4 hover:underline">
@@ -117,7 +117,7 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <span className="text-sm text-muted">{formatDateTime(r.created_at)}</span>
-                  <StatusSelect id={r.id} status={r.status} label={r.full_name} />
+                  <StatusSelect id={r.id} status={r.status} label={`${r.full_name} (${r.reference})`} />
                 </div>
               </li>
             ))}
