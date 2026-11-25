@@ -1,5 +1,6 @@
 import "server-only";
 import postgres from "postgres";
+import { after } from "next/server";
 import { env } from "./env";
 
 type Sql = ReturnType<typeof postgres>;
@@ -20,13 +21,31 @@ export function sslFor(url: string): "require" | false | undefined {
 }
 const g = globalThis as unknown as { __sql?: Sql };
 
+/**
+ * Serverless hosts (Vercel) pause the function between requests. A database connection left open
+ * during a pause can silently die, and the next request then waits on it instead of failing:
+ * the site seems to "stop responding". So idle connections are closed after IDLE_SECONDS, and each
+ * request keeps the function alive slightly longer than that (via `after`), so nothing stale survives
+ * a pause. Same idea as Vercel's attachDatabasePool, which does not support this driver.
+ */
+const IDLE_SECONDS = 2;
+
+function keepAliveUntilIdle() {
+  try {
+    after(() => new Promise((resolve) => setTimeout(resolve, IDLE_SECONDS * 1000 + 500)));
+  } catch {
+    // Outside a request (e.g. scripts): nothing to keep alive.
+  }
+}
+
 /** Shared connection pool (reused across hot reloads in development). */
 export function db(): Sql {
+  keepAliveUntilIdle();
   if (!g.__sql) {
     g.__sql = postgres(env.databaseUrl, {
       max: Number(process.env.DATABASE_POOL_MAX || 5),
       prepare: false, // compatible with transaction poolers (Supabase :6543, PgBouncer)
-      idle_timeout: 20,
+      idle_timeout: IDLE_SECONDS,
       connect_timeout: 10,
       onnotice: () => {},
       ssl: sslFor(env.databaseUrl),
