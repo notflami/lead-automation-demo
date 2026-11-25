@@ -3,6 +3,7 @@
 import { startTransition, useActionState } from "react";
 import { saveSettingsAction } from "@/app/admin/actions";
 import type { EventSettings } from "@/lib/types";
+import { TranslationsEditor } from "./TranslationsEditor";
 
 type Values = Omit<EventSettings, "updated_at">;
 const input = "field-input min-h-11 text-base";
@@ -146,6 +147,8 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
           <textarea name="privacy_notes" defaultValue={v.privacy_notes} rows={3} maxLength={4000} className={`${input} min-h-20`} />
         </Field>
       </Group>
+
+      <TranslationsEditor v={v} />
 
       <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-4 border-t border-ink/10 bg-[#f3f2ee]/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-5">
         <button disabled={pending} className="min-h-11 rounded-lg bg-saffron px-6 font-semibold text-ink-deep hover:bg-saffron-light disabled:opacity-60">

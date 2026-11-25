@@ -5,14 +5,14 @@ import "@fontsource-variable/commissioner/wght.css";
 import "./globals.css";
 import { siteUrl } from "@/lib/env";
 import { getLocale } from "@/lib/locale";
-import { getSettings } from "@/lib/settings";
+import { getSettings, localizeSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const base = siteUrl();
   try {
-    const s = await getSettings();
+    const s = localizeSettings(await getSettings(), await getLocale());
     const description = s.tagline || s.about_text.slice(0, 160);
     return {
       metadataBase: new URL(base),

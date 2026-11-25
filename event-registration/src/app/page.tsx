@@ -8,12 +8,13 @@ import { formatDayMonth, formatEventDate, formatTimeRange, splitLines } from "@/
 import { issueFormToken } from "@/lib/form-token";
 import { getDict } from "@/lib/locale";
 import { getRemainingPlaces } from "@/lib/registrations";
-import { getSettings } from "@/lib/settings";
+import { getSettings, localizeSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [{ locale, t }, s] = await Promise.all([getDict(), getSettings()]);
+  const [{ locale, t }, base] = await Promise.all([getDict(), getSettings()]);
+  const s = localizeSettings(base, locale);
   const [places, formToken] = await Promise.all([getRemainingPlaces(s.max_capacity, s.vip_capacity), issueFormToken()]);
   const remaining = places.total;
 

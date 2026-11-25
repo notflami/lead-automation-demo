@@ -126,8 +126,11 @@ All of this can be changed at any time without touching code. The event texts ar
 for 19 December 2026, 22:00, Crimmitschauer Str. 77, 08058 Zwickau (in German); check and adjust them.
 
 The website buttons and messages are available in German, English, Albanian, Bosnian, Croatian,
-Serbian and Turkish (menu with flags at the top). The event texts you type here are shown as written,
-in every language. Privacy notice and Impressum are shown in German, or in English for the other
+Serbian and Turkish (menu with flags at the top). The event texts you type (short line, "About the
+evening", "What to expect", dress code, "Good to know", ticket info) can be translated in **Event
+settings → Translations of your texts**: one tab per language, the German original is shown above each
+field, empty fields show the German text. When you change a German text, update its translations too.
+Event name and address are not translated. Privacy notice and Impressum are shown in German, or in English for the other
 languages.
 
 ---

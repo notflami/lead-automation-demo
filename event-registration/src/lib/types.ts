@@ -3,6 +3,18 @@ export const STATUSES: RegistrationStatus[] = ["confirmed", "waitlisted", "check
 /** Statuses that occupy capacity. */
 export const SEATED: RegistrationStatus[] = ["confirmed", "checked_in"];
 
+/** Texts organizers edit that can be translated per language (event name and address are not). */
+export const TRANSLATABLE_FIELDS = [
+  "tagline",
+  "about_text",
+  "expectations",
+  "dress_code",
+  "additional_info",
+  "ticket_normal_info",
+  "ticket_vip_info",
+] as const;
+export type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number];
+
 export interface EventSettings {
   event_name: string;
   tagline: string;
@@ -31,6 +43,8 @@ export interface EventSettings {
   organizer_address: string;
   privacy_notes: string;
   data_retention_days: number;
+  /** Translations of the editable texts: translations[lang][field]. German is the base text. */
+  translations: Partial<Record<string, Partial<Record<TranslatableField, string>>>>;
   updated_at: Date;
 }
 
