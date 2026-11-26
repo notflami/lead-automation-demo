@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
-import { markPaid, markUnpaid } from "@/lib/payments";
+import { markPaid, markRefundedByPaymentIntent, markUnpaid } from "@/lib/payments";
 import { stripe } from "@/lib/stripe";
 import { deliverRegistrationWebhook } from "@/lib/webhook";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /**
  * Stripe → website notifications (configure in Stripe: Developers → Webhooks).
  * Events: checkout.session.completed, checkout.session.async_payment_succeeded,
- *         checkout.session.async_payment_failed, checkout.session.expired
+ *         checkout.session.async_payment_failed, checkout.session.expired, charge.refunded
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
     case "checkout.session.expired":
       await markUnpaid(session.id, "expired");
       break;
+    case "charge.refunded": {
+      // Refund made directly in the Stripe dashboard: mark the reservation (only when fully refunded).
+      const charge = event.data.object as Stripe.Charge;
+      const pi = typeof charge.payment_intent === "string" ? charge.payment_intent : charge.payment_intent?.id;
+      if (pi && charge.refunded) await markRefundedByPaymentIntent(pi);
+      break;
+    }
   }
   return NextResponse.json({ received: true });
 }

@@ -80,6 +80,9 @@ export interface Registration {
   checkout_url: string | null;
   hold_expires_at: Date | null;
   paid_at: Date | null;
+  stripe_payment_intent: string | null;
+  refunded_at: Date | null;
+  refund_error: string | null;
 }
 
 export interface CapacityStats {

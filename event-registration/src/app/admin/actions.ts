@@ -14,6 +14,7 @@ import { STATUSES, TRANSLATABLE_FIELDS, type RegistrationStatus } from "@/lib/ty
 import { LOCALES, type Locale } from "@/lib/i18n";
 import { adminRegistrationSchema, settingsSchema } from "@/lib/validation";
 import { retryPendingWebhooks } from "@/lib/webhook";
+import { refundAll, refundRegistration } from "@/lib/payments";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | null;
 
@@ -139,4 +140,26 @@ export async function anonymizeAllAction(_: ActionState, form: FormData): Promis
   const n = await anonymizeRegistrations(true);
   revalidatePath("/admin", "layout");
   return { ok: true, message: `Personal data removed from ${n} registration(s). Guest totals are kept.` };
+}
+
+// ------------------------------------------------------------------ refunds
+const euroText = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+
+export async function refundOneAction(id: string): Promise<ActionState> {
+  await requireAdmin();
+  const out = await refundRegistration(id);
+  revalidatePath("/admin", "layout");
+  return out.ok ? { ok: true, message: "Refunded. The money goes back to the guest's payment method; the reservation is cancelled." } : { error: `Refund failed: ${out.error}` };
+}
+
+export async function refundAllAction(_: ActionState, form: FormData): Promise<ActionState> {
+  await requireAdmin();
+  if (String(form.get("confirm") || "").trim().toUpperCase() !== "REFUND ALL") return { error: "Type REFUND ALL to confirm." };
+  const r = await refundAll();
+  revalidatePath("/", "layout");
+  revalidatePath("/admin", "layout");
+  const base = `Registration closed. ${r.refunded} reservation(s) refunded (${euroText(r.amountCents)}).`;
+  if (r.failed.length)
+    return { error: `${base} ${r.failed.length} failed: ${r.failed.map((f) => f.reference).join(", ")}. Run this again to retry, or refund them in Stripe.` };
+  return { ok: true, message: base };
 }

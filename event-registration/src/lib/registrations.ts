@@ -15,7 +15,7 @@ export type CreateResult =
 const REG_COLUMNS = `id, reference, full_name, phone, email, guest_count, ticket_type, status, locale, admin_note,
   created_at, updated_at, cancelled_at, anonymized_at, webhook_status, webhook_attempts,
   webhook_last_error, webhook_sent_at, payment_status, amount_cents, stripe_session_id, checkout_url,
-  hold_expires_at, paid_at`;
+  hold_expires_at, paid_at, stripe_payment_intent, refunded_at, refund_error`;
 
 /** Places taken: confirmed, checked in, and still-valid payment holds. */
 const SEATED = `(status in ('confirmed', 'checked_in') or (status = 'pending_payment' and hold_expires_at > now()))`;

@@ -54,7 +54,9 @@ export type PaidResult = { changed: boolean; registration: Registration | null }
  * Marks a reservation as paid (idempotent; called from the webhook and from the return page).
  * A payment is always honoured, even if it arrives after the hold ended.
  */
-export async function markPaid(session: Pick<Stripe.Checkout.Session, "id" | "payment_status" | "amount_total">): Promise<PaidResult> {
+export async function markPaid(
+  session: Pick<Stripe.Checkout.Session, "id" | "payment_status" | "amount_total"> & { payment_intent?: string | Stripe.PaymentIntent | null },
+): Promise<PaidResult> {
   if (session.payment_status !== "paid") return { changed: false, registration: await bySession(session.id) };
   return db().begin(async (tx) => {
     await tx`select 1 from event_settings where id = 1 for update`;
@@ -66,6 +68,7 @@ export async function markPaid(session: Pick<Stripe.Checkout.Session, "id" | "pa
       update registrations set
         status = 'confirmed', payment_status = 'paid', paid_at = now(), cancelled_at = null,
         amount_cents = coalesce(${session.amount_total ?? null}, amount_cents),
+        stripe_payment_intent = coalesce(${paymentIntentId(session.payment_intent)}, stripe_payment_intent),
         webhook_status = 'pending', updated_at = now(),
         admin_note = case when ${late} then trim(admin_note || ' Paid after the 35-minute hold had ended: check capacity.') else admin_note end
       where id = ${r.id} returning *`;
@@ -100,4 +103,66 @@ export async function releaseHolds(): Promise<number> {
     await tx`select 1 from event_settings where id = 1 for update`;
     return releaseExpiredHolds(tx);
   });
+}
+
+function paymentIntentId(pi: string | Stripe.PaymentIntent | null | undefined): string | null {
+  if (!pi) return null;
+  return typeof pi === "string" ? pi : pi.id;
+}
+
+export type RefundOutcome = { ok: true; amountCents: number } | { ok: false; error: string };
+
+/**
+ * Refunds one paid reservation in full (back to the guest's original payment method) and cancels it.
+ * Safe to repeat: Stripe's idempotency key prevents a second refund of the same reservation.
+ */
+export async function refundRegistration(id: string): Promise<RefundOutcome> {
+  const [r] = await db()<Registration[]>`select * from registrations where id = ${id}`;
+  if (!r) return { ok: false, error: "Registration not found." };
+  if (r.payment_status === "refunded") return { ok: true, amountCents: 0 };
+  if (r.payment_status !== "paid") return { ok: false, error: "This reservation was not paid online." };
+  try {
+    let pi = r.stripe_payment_intent;
+    if (!pi && r.stripe_session_id) pi = paymentIntentId((await stripe().checkout.sessions.retrieve(r.stripe_session_id)).payment_intent);
+    if (!pi) throw new Error("No Stripe payment found for this reservation.");
+    await stripe().refunds.create(
+      { payment_intent: pi, reason: "requested_by_customer", metadata: { reference: r.reference } },
+      { idempotencyKey: `refund-${r.id}` },
+    );
+    await db()`
+      update registrations set payment_status = 'refunded', refunded_at = now(), refund_error = null,
+        stripe_payment_intent = ${pi}, status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), updated_at = now()
+      where id = ${r.id}`;
+    return { ok: true, amountCents: r.amount_cents };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await db()`update registrations set refund_error = ${message.slice(0, 500)}, updated_at = now() where id = ${r.id}`;
+    return { ok: false, error: message };
+  }
+}
+
+/** Refund everything that was paid online (event cancelled). Closes registration first. Can be run again to retry failures. */
+export async function refundAll(): Promise<{ refunded: number; amountCents: number; failed: { reference: string; error: string }[] }> {
+  await db()`update event_settings set registration_open = false, updated_at = now() where id = 1`;
+  const rows = await db()<{ id: string; reference: string }[]>`
+    select id, reference from registrations where payment_status = 'paid' order by created_at`;
+  let refunded = 0;
+  let amountCents = 0;
+  const failed: { reference: string; error: string }[] = [];
+  for (const row of rows) {
+    const out = await refundRegistration(row.id);
+    if (out.ok) {
+      refunded++;
+      amountCents += out.amountCents;
+    } else failed.push({ reference: row.reference, error: out.error });
+  }
+  return { refunded, amountCents, failed };
+}
+
+/** Stripe "charge.refunded" (e.g. a refund made directly in the Stripe dashboard). */
+export async function markRefundedByPaymentIntent(paymentIntent: string): Promise<void> {
+  await db()`
+    update registrations set payment_status = 'refunded', refunded_at = coalesce(refunded_at, now()), refund_error = null,
+      status = 'cancelled', cancelled_at = coalesce(cancelled_at, now()), updated_at = now()
+    where stripe_payment_intent = ${paymentIntent} and payment_status = 'paid'`;
 }

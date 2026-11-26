@@ -82,7 +82,8 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
                   <tr key={r.id} className={r.status === "cancelled" ? "text-muted" : ""}>
                     <td className="px-4 py-2.5 font-mono text-sm tabular-nums">{r.reference}</td>
                     <td className="px-4 py-2.5 font-medium">
-                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />} {r.payment_status === "paid" && <PaidBadge />}
+                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />} {r.payment_status === "paid" && <PaidBadge />}{" "}
+                      {r.payment_status === "refunded" && <span className="rounded-full bg-[#ecebe8] px-2 py-0.5 text-xs font-semibold text-muted">Refunded</span>}
                     </td>
                     <td className="px-4 py-2.5 tabular-nums">
                       <a href={`tel:${r.phone}`} className="hover:underline">{r.phone}</a>
@@ -110,7 +111,8 @@ export default async function RegistrationsPage({ searchParams }: { searchParams
                 <div className="flex items-start gap-3">
                   <Link href={`/admin/registrations/${r.id}`} className="min-w-0 flex-1">
                     <span className="block truncate font-semibold text-ink">
-                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />} {r.payment_status === "paid" && <PaidBadge />}
+                      {r.full_name} {r.ticket_type === "vip" && <VipBadge />} {r.payment_status === "paid" && <PaidBadge />}{" "}
+                      {r.payment_status === "refunded" && <span className="rounded-full bg-[#ecebe8] px-2 py-0.5 text-xs font-semibold text-muted">Refunded</span>}
                     </span>
                     <span className="block text-sm text-muted tabular-nums">
                       {r.reference}, {r.phone}

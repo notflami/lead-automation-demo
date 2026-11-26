@@ -204,7 +204,7 @@ automatically. No monthly fee; Stripe charges per payment.
 2. Stripe → **Developers → Webhooks** → **Add endpoint** (or "Add destination" → Webhook endpoint):
    - **Endpoint URL:** `https://balkan-night-zwickau.vercel.app/api/stripe/webhook` (your address + `/api/stripe/webhook`)
    - **Events:** `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-     `checkout.session.async_payment_failed`, `checkout.session.expired`
+     `checkout.session.async_payment_failed`, `checkout.session.expired`, `charge.refunded`
    - Save, then click **Reveal** next to **Signing secret** (`whsec_…`).
      In Vercel add the setting `STRIPE_WEBHOOK_SECRET` with this value.
 3. Vercel → **Deployments → ⋯ → Redeploy**.
@@ -224,8 +224,23 @@ automatically. No monthly fee; Stripe charges per payment.
 3. In Vercel replace `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` with the live values → **Redeploy**.
 4. Dashboard → Event settings should now say "LIVE mode". Make one real purchase yourself and refund it.
 
-**Refunds:** Stripe → **Payments** → open the payment → **Refund**. Then set the reservation to
-**Cancelled** in the dashboard so the places become free.
+**Keep the money in Stripe until your decision:** Stripe → **Settings → Payouts → Payout schedule →
+Manual**. Ticket money then stays in your Stripe balance (nothing goes to the bank) until you click
+**Pay out** in Stripe. This way every refund is covered if the event is cancelled.
+
+**Refund one guest:** dashboard → open the reservation → **Refund … and cancel**. (A refund made
+directly in Stripe is also picked up automatically thanks to the `charge.refunded` event.)
+
+**Plan B: cancel the event and refund everyone:** dashboard → **Event settings → Cancel the event:
+refund everyone** → type `REFUND ALL` → **Refund all**. Registration closes, every reservation paid
+online is refunded in full to the payment method the guest used (cards usually 5–10 business days),
+and the summary shows how many were refunded. If any fail, click again: refunded ones are skipped.
+Stripe normally keeps its processing fees on refunds. Tell guests in your AGB, e.g. *"Findet die
+Veranstaltung mangels Nachfrage nicht statt (Entscheidung bis TT.MM.JJJJ), wird der volle Ticketpreis
+auf das ursprüngliche Zahlungsmittel erstattet."*
+
+**Plan A: the event happens:** after your decision date, Stripe → **Balances → Pay out** (or set
+payouts back to automatic).
 
 ---
 

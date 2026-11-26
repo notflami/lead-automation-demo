@@ -273,3 +273,10 @@ create index if not exists registrations_pending_payment_idx on registrations (h
 alter table event_settings add column if not exists payments_enabled boolean not null default false;
 alter table event_settings add column if not exists terms_text       text    not null default '';
 insert into schema_migrations (name) values ('009_online_payment.sql') on conflict do nothing;
+
+-- ===== 010_refunds.sql =====
+-- Refunds: the Stripe PaymentIntent is needed to refund a paid reservation.
+alter table registrations add column if not exists stripe_payment_intent text;
+alter table registrations add column if not exists refunded_at timestamptz;
+alter table registrations add column if not exists refund_error text;
+insert into schema_migrations (name) values ('010_refunds.sql') on conflict do nothing;
