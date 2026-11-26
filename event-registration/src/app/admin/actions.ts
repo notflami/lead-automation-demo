@@ -145,8 +145,8 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     ...(doorPassword ? { door_password_hash: hashDoorPassword(doorPassword) } : {}),
   };
   await transaction((sql) => sql`update event_settings set ${sql(values)},
-    sales_start = case when ${salesStart} = '' then null else ${salesStart}::timestamp at time zone ${EVENT_TZ} end,
-    sales_end = case when ${salesEnd} = '' then null else ${salesEnd}::timestamp at time zone ${EVENT_TZ} end
+    sales_start = ${salesStart || null}::timestamp at time zone ${EVENT_TZ},
+    sales_end = ${salesEnd || null}::timestamp at time zone ${EVENT_TZ}
     where id = 1`);
   revalidatePath("/", "layout");
   return {
