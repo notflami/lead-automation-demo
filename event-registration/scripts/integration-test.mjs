@@ -40,6 +40,7 @@ const mock = http
 
 // ---- mock Stripe API (STRIPE_API_URL=http://localhost:12111 in the server's env) --
 const sessions = new Map();
+const refunds = [];
 let stripeDown = false;
 const stripeMock = http
   .createServer((req, res) => {
@@ -52,6 +53,12 @@ const stripeMock = http
       };
       if (stripeDown) return send(500, { error: { type: "api_error", message: "mock outage" } });
       const f = new URLSearchParams(b);
+      if (req.method === "POST" && req.url.startsWith("/v1/refunds")) {
+        const pi = f.get("payment_intent");
+        if (pi === "pi_fail") return send(400, { error: { type: "invalid_request_error", message: "mock refund failure" } });
+        refunds.push(pi);
+        return send(200, { id: "re_" + crypto.randomBytes(6).toString("hex"), object: "refund", status: "succeeded", payment_intent: pi });
+      }
       const m = req.url.match(/^\/v1\/checkout\/sessions(?:\/([^/?]+))?(\/expire)?/);
       if (!m) return send(404, { error: { message: "not mocked" } });
       if (req.method === "POST" && !m[1]) {
@@ -75,7 +82,7 @@ const stripeMock = http
     });
   })
   .listen(12111);
-const paySession = (id) => Object.assign(sessions.get(id), { status: "complete", payment_status: "paid" });
+const paySession = (id) => Object.assign(sessions.get(id), { status: "complete", payment_status: "paid", payment_intent: "pi_" + id.slice(8) });
 const stripeSdk = new Stripe("sk_test_local_mock");
 async function stripeEvent(type, session, secret = process.env.STRIPE_WEBHOOK_SECRET) {
   const payload = JSON.stringify({ id: "evt_" + crypto.randomBytes(6).toString("hex"), object: "event", type, data: { object: session } });
@@ -302,6 +309,13 @@ try {
   const [r2b] = await sql`select status, payment_status from registrations where id = ${r2.id}`;
   check("signed webhook confirms the payment", wh.status === 200 && r2b.status === "confirmed" && r2b.payment_status === "paid");
   check("webhook repeated → no change, no error", (await stripeEvent("checkout.session.completed", sessions.get(r2.stripe_session_id))).status === 200);
+
+  // Refund made in the Stripe dashboard → reservation marked refunded
+  const [paidRow] = await sql`select id, stripe_payment_intent from registrations where id = ${r2.id}`;
+  check("payment ID stored for refunds", paidRow.stripe_payment_intent === "pi_" + r2.stripe_session_id.slice(8));
+  await stripeEvent("charge.refunded", { id: "ch_1", object: "charge", refunded: true, payment_intent: paidRow.stripe_payment_intent });
+  const [refRow] = await sql`select status, payment_status from registrations where id = ${r2.id}`;
+  check("Stripe 'charge.refunded' → reservation refunded and cancelled", refRow.payment_status === "refunded" && refRow.status === "cancelled");
 
   // Cancel on Stripe → hold released
   await reset({ max_capacity: 4, payments_enabled: true, price_normal_cents: 2000 });

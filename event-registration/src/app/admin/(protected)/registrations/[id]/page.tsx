@@ -2,11 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EditRegistrationForm } from "@/components/admin/EditRegistrationForm";
 import { StatusBadge, VipBadge } from "@/components/admin/StatusBadge";
+import { ActionButton } from "@/components/admin/ActionButton";
+import { refundOneAction } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { getRegistration } from "@/lib/registrations";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
 
@@ -89,10 +92,20 @@ export default async function RegistrationDetail({ params }: { params: Promise<{
                   {r.payment_status === "pending" && r.hold_expires_at && <>Awaiting payment until {formatDateTime(r.hold_expires_at)}</>}
                   {r.payment_status === "expired" && "Not paid (payment page closed or expired)"}
                   {r.payment_status === "failed" && "Payment failed"}
-                  {r.payment_status === "refunded" && "Refunded"}
+                  {r.payment_status === "refunded" && `Refunded ${euro(r.amount_cents)}`}
+                  {r.payment_status === "refunded" && r.refunded_at && <span className="block text-muted">on {formatDateTime(r.refunded_at)}</span>}
                   {r.stripe_session_id && <span className="mt-1 block font-mono text-xs break-all text-muted">{r.stripe_session_id}</span>}
+                  {r.refund_error && <span className="mt-1 block text-sm text-kilim-dark">Last refund attempt failed: {r.refund_error}</span>}
                   {r.payment_status === "paid" && (
-                    <span className="mt-1 block text-sm text-muted">Refunds: Stripe dashboard → Payments → open the payment → Refund.</span>
+                    <span className="mt-2 block">
+                      <ActionButton
+                        action={refundOneAction.bind(null, r.id)}
+                        confirm={`Refund ${euro(r.amount_cents)} to ${r.full_name} and cancel this reservation?`}
+                        className="border border-kilim/40 text-kilim-dark hover:bg-kilim/8"
+                      >
+                        Refund {euro(r.amount_cents)} and cancel
+                      </ActionButton>
+                    </span>
                   )}
                 </dd>
               </div>
