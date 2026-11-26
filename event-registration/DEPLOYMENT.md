@@ -267,6 +267,8 @@ Several phones can scan at the same time; one QR code can never admit more peopl
 
 **Tickets at the door (Abendkasse):** the text in Event settings → "Tickets at the door" is shown on the website when online reservations are sold out or closed (translations under "Translations of your texts").
 
+**Online sales window (optional):** Event settings → Registration → "Online sales start" / "Online sales end" (German time). Before the start the page shows a countdown instead of the form; the form appears by itself at the start time. From the end on, the page says "Der Online-Verkauf ist beendet" and shows the Abendkasse text. Leave both empty to sell without a time limit.
+
 ## Part 5: Final test before sharing (10 minutes)
 
 On your **phone**, using mobile data (not Wi-Fi):

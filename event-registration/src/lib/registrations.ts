@@ -55,8 +55,11 @@ export async function createRegistration(
 ): Promise<CreateResult> {
   const sql = db();
   return sql.begin(async (tx) => {
+    // "Open" also requires being inside the online sales window (if one is set).
     const [settings] = await tx<{ max_capacity: number; vip_capacity: number; registration_open: boolean; waitlist_enabled: boolean }[]>`
-      select max_capacity, vip_capacity, registration_open, waitlist_enabled from event_settings where id = 1 for update`;
+      select max_capacity, vip_capacity, waitlist_enabled,
+             registration_open and (sales_start is null or now() >= sales_start) and (sales_end is null or now() < sales_end) as registration_open
+      from event_settings where id = 1 for update`;
 
     // Checked AFTER taking the lock, so two simultaneous identical submissions can't both pass.
     // Same idempotency key = same form submission (double tap, retry on flaky mobile network).

@@ -4,9 +4,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
 import { TicketQr } from "./TicketQr";
+import { Countdown } from "./Countdown";
 import { dictionaries, type Locale } from "@/lib/i18n";
 
-export type FormMode = "open" | "waitlist" | "full" | "closed";
+export type FormMode = "open" | "waitlist" | "full" | "closed" | "upcoming" | "ended";
 
 export interface EventSummary {
   name: string;
@@ -66,6 +67,8 @@ export function RegistrationForm(props: {
   tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string; priceNormal: number; priceVip: number };
   /** Text about tickets at the door (Abendkasse), shown when sold out or closed. "" hides it. */
   doorInfo?: string;
+  /** Before online sales start: countdown target and the start as text. */
+  sales?: { startIso: string; startText: string; serverNow: number };
   /** Online payment active (Stripe configured and switched on in Event settings). */
   payment: { enabled: boolean; termsUrl: string | null };
 }) {
@@ -419,6 +422,32 @@ export function RegistrationForm(props: {
         <button type="button" onClick={reset} className="mt-4 inline-flex min-h-11 items-center text-base font-medium text-muted underline underline-offset-4 hover:text-ink">
           {t.newReservation}
         </button>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------- before online sales start
+  if (props.mode === "upcoming" && props.sales) {
+    return (
+      <div>
+        <h3 className="display text-[2rem] leading-tight text-ink sm:text-4xl">{t.salesSoonHeading}</h3>
+        <div className="mt-5">
+          <Countdown target={props.sales.startIso} serverNow={props.sales.serverNow} units={t.countdownUnits} />
+        </div>
+        <p className="mt-4 text-lg text-thread">
+          {t.salesStartLabel} <span className="font-semibold text-ink">{props.sales.startText}</span>
+        </p>
+      </div>
+    );
+  }
+
+  // ---------------------------------------------------------------- online sales ended
+  if (props.mode === "ended") {
+    return (
+      <div>
+        <h3 className="display text-4xl text-ink">{t.salesEndedHeading}</h3>
+        <p className="mt-3 text-lg text-thread">{t.salesEndedText}</p>
+        {props.doorInfo && <DoorInfo heading={t.doorSalesHeading} text={props.doorInfo} className="mt-6" />}
       </div>
     );
   }
