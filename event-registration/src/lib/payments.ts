@@ -1,6 +1,6 @@
 import "server-only";
 import type Stripe from "stripe";
-import { db } from "./db";
+import { db, transaction } from "./db";
 import { siteUrl } from "./env";
 import { releaseExpiredHolds } from "./registrations";
 import { CHECKOUT_MINUTES, stripe, stripeLocale } from "./stripe";
@@ -58,7 +58,7 @@ export async function markPaid(
   session: Pick<Stripe.Checkout.Session, "id" | "payment_status" | "amount_total"> & { payment_intent?: string | Stripe.PaymentIntent | null },
 ): Promise<PaidResult> {
   if (session.payment_status !== "paid") return { changed: false, registration: await bySession(session.id) };
-  return db().begin(async (tx) => {
+  return transaction(async (tx) => {
     await tx`select 1 from event_settings where id = 1 for update`;
     const [r] = await tx<Registration[]>`select * from registrations where stripe_session_id = ${session.id} for update`;
     if (!r) return { changed: false, registration: null };
@@ -99,7 +99,7 @@ export async function bySession(sessionId: string): Promise<Registration | null>
 }
 
 export async function releaseHolds(): Promise<number> {
-  return db().begin(async (tx) => {
+  return transaction(async (tx) => {
     await tx`select 1 from event_settings where id = 1 for update`;
     return releaseExpiredHolds(tx);
   });

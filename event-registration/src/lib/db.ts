@@ -1,5 +1,6 @@
 import "server-only";
 import postgres from "postgres";
+import type { TransactionSql } from "postgres";
 import { after } from "next/server";
 import { env } from "./env";
 
@@ -52,4 +53,17 @@ export function db(): Sql {
     });
   }
   return g.__sql;
+}
+
+/**
+ * A transaction that can never block the database for long: waiting for a lock gives up after 15 s,
+ * and if the server process freezes mid-transaction (serverless), Postgres ends it after 20 s and
+ * releases its locks instead of keeping them until the connection dies.
+ */
+export function transaction<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return db().begin(async (tx) => {
+    await tx`set local lock_timeout = '15s'`;
+    await tx`set local idle_in_transaction_session_timeout = '20s'`;
+    return fn(tx);
+  }) as Promise<T>;
 }

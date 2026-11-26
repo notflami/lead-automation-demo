@@ -1,5 +1,5 @@
 import "server-only";
-import { db } from "./db";
+import { db, transaction } from "./db";
 import { env } from "./env";
 import { hmacHex } from "./crypto";
 import type { Registration } from "./types";
@@ -58,7 +58,7 @@ export async function deliverRegistrationWebhook(registrationId: string): Promis
     await sql`update registrations set webhook_status = 'skipped' where id = ${registrationId} and webhook_status = 'pending'`;
     return "skipped";
   }
-  return sql.begin(async (tx) => {
+  return transaction(async (tx) => {
     // skip locked: if another worker is already delivering this row, do nothing (no double send).
     const [row] = await tx<(Registration & { event_name: string; price_normal_cents: number; price_vip_cents: number })[]>`
       select r.*, s.event_name, s.price_normal_cents, s.price_vip_cents from registrations r, event_settings s

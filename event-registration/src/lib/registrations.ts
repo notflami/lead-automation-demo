@@ -1,5 +1,5 @@
 import "server-only";
-import { db } from "./db";
+import { db, transaction } from "./db";
 import { decideCapacity } from "./capacity";
 import { HOLD_MINUTES } from "./stripe";
 import type { CapacityStats, Registration, RegistrationStatus } from "./types";
@@ -54,7 +54,7 @@ export async function createRegistration(
   payment: { required: boolean; unitPriceCents: number } = { required: false, unitPriceCents: 0 },
 ): Promise<CreateResult> {
   const sql = db();
-  return sql.begin(async (tx) => {
+  return transaction(async (tx) => {
     // "Open" also requires being inside the online sales window (if one is set).
     const [settings] = await tx<{ max_capacity: number; vip_capacity: number; registration_open: boolean; waitlist_enabled: boolean }[]>`
       select max_capacity, vip_capacity, waitlist_enabled,
@@ -234,7 +234,7 @@ export async function updateRegistration(
     adminNote: string;
   },
 ): Promise<UpdateResult> {
-  return db().begin(async (tx) => {
+  return transaction(async (tx) => {
     const [settings] = await tx<{ max_capacity: number; vip_capacity: number }[]>`
       select max_capacity, vip_capacity from event_settings where id = 1 for update`;
     const [current] = await tx<{ status: RegistrationStatus; guest_count: number; anonymized_at: Date | null }[]>`

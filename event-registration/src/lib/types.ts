@@ -46,8 +46,9 @@ export interface EventSettings {
   registration_open: boolean;
   waitlist_enabled: boolean;
   /** Online sales window (null = no limit) and the same times as "YYYY-MM-DDTHH:MM" in the event's time zone. */
-  sales_start: Date | null;
-  sales_end: Date | null;
+  /** Milliseconds since 1970 (null = not set). Plain numbers: no date parsing involved. */
+  sales_start_ms: number | null;
+  sales_end_ms: number | null;
   sales_start_local: string;
   sales_end_local: string;
   contact_email: string;
