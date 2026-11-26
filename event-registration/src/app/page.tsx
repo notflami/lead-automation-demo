@@ -21,8 +21,10 @@ export default async function HomePage() {
   const remaining = places.total;
 
   const now = Date.now();
-  const beforeSales = s.sales_start !== null && now < s.sales_start.getTime();
-  const afterSales = s.sales_end !== null && now >= s.sales_end.getTime();
+  const salesStart = typeof s.sales_start_ms === "number" ? s.sales_start_ms : null;
+  const salesEnd = typeof s.sales_end_ms === "number" ? s.sales_end_ms : null;
+  const beforeSales = salesStart !== null && now < salesStart;
+  const afterSales = salesEnd !== null && now >= salesEnd;
   const mode: FormMode = !s.registration_open
     ? "closed"
     : beforeSales
@@ -35,7 +37,7 @@ export default async function HomePage() {
             ? "waitlist"
             : "full";
   const salesStartText =
-    beforeSales && s.sales_start
+    beforeSales && salesStart !== null
       ? new Intl.DateTimeFormat(LANGUAGES.find((l) => l.code === locale)?.intl ?? "de-DE", {
           weekday: "long",
           day: "numeric",
@@ -43,7 +45,7 @@ export default async function HomePage() {
           hour: "2-digit",
           minute: "2-digit",
           timeZone: EVENT_TZ,
-        }).format(s.sales_start)
+        }).format(new Date(salesStart))
       : "";
   const dateText = formatEventDate(s.event_date, locale);
   const dm = formatDayMonth(s.event_date, locale);
@@ -138,7 +140,7 @@ export default async function HomePage() {
                 siteUrl={env.siteUrl()}
                 whatsappNumber={s.whatsapp_number}
                 doorInfo={s.door_sales_info.trim()}
-                sales={beforeSales && s.sales_start ? { startIso: s.sales_start.toISOString(), startText: salesStartText, serverNow: now } : undefined}
+                sales={beforeSales && salesStart !== null ? { startIso: new Date(salesStart).toISOString(), startText: salesStartText, serverNow: now } : undefined}
                 payment={{ enabled: s.payments_enabled && stripeConfigured(), termsUrl: s.terms_text.trim() ? "/terms" : null }}
                 tickets={{
                   vipEnabled: s.vip_capacity > 0,

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSessionCookie, destroySession, requireAdmin } from "@/lib/auth";
 import { safeEqual } from "@/lib/crypto";
-import { db } from "@/lib/db";
+import { db, transaction } from "@/lib/db";
 import { env } from "@/lib/env";
 import { normalizePhone } from "@/lib/phone";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
@@ -144,11 +144,10 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     updated_at: new Date(),
     ...(doorPassword ? { door_password_hash: hashDoorPassword(doorPassword) } : {}),
   };
-  const sql = db();
-  await sql`update event_settings set ${sql(values)},
+  await transaction((sql) => sql`update event_settings set ${sql(values)},
     sales_start = case when ${salesStart} = '' then null else ${salesStart}::timestamp at time zone ${EVENT_TZ} end,
     sales_end = case when ${salesEnd} = '' then null else ${salesEnd}::timestamp at time zone ${EVENT_TZ} end
-    where id = 1`;
+    where id = 1`);
   revalidatePath("/", "layout");
   return {
     ok: true,
