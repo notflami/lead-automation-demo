@@ -75,6 +75,25 @@ export default async function RegistrationDetail({ params }: { params: Promise<{
                 <dd>{formatDateTime(r.cancelled_at)}</dd>
               </div>
             )}
+            {r.checked_in_guests > 0 && (
+              <div>
+                <dt className="text-sm text-muted">Checked in at the door</dt>
+                <dd>
+                  {r.checked_in_guests} of {r.guest_count} {r.checked_in_at && <span className="text-muted">· first at {formatDateTime(r.checked_in_at)}</span>}
+                </dd>
+              </div>
+            )}
+            {(r.status === "confirmed" || r.status === "checked_in") && !r.anonymized_at && (
+              <div>
+                <dt className="text-sm text-muted">Entry ticket (QR code)</dt>
+                <dd>
+                  <a href={`/ticket/${r.ticket_token}`} target="_blank" className="font-semibold underline underline-offset-4">
+                    Open ticket
+                  </a>{" "}
+                  <span className="text-sm text-muted">– send this link to the guest if they lost their QR code</span>
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm text-muted">Language used</dt>
               <dd>{r.locale === "de" ? "German" : "English"}</dd>

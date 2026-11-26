@@ -21,9 +21,9 @@ export async function GET(req: Request) {
   const rows = await listRegistrations({ q: url.searchParams.get("q") || "", status: url.searchParams.get("status") || "all" });
   const tz = process.env.EVENT_TIMEZONE || "Europe/Berlin";
   const fmt = new Intl.DateTimeFormat("sv-SE", { timeZone: tz, dateStyle: "short", timeStyle: "medium" });
-  const header = ["Registration ID", "Full name", "Phone", "Guests", "Ticket", "Amount (EUR)", "Payment", "Paid (EUR)", "Status", "Registered at", "Note"];
+  const header = ["Registration ID", "Full name", "Phone", "Guests", "Ticket", "Amount (EUR)", "Payment", "Paid (EUR)", "Status", "Checked in", "Registered at", "Note"];
   const lines = rows.map((r) =>
-    [r.reference, r.full_name, r.phone, r.guest_count, r.ticket_type === "vip" ? "VIP" : "Normal", amount(r), r.payment_status === "none" ? "" : r.payment_status, r.payment_status === "paid" ? (r.amount_cents / 100).toFixed(2).replace(".", ",") : "", r.status, fmt.format(new Date(r.created_at)), r.admin_note]
+    [r.reference, r.full_name, r.phone, r.guest_count, r.ticket_type === "vip" ? "VIP" : "Normal", amount(r), r.payment_status === "none" ? "" : r.payment_status, r.payment_status === "paid" ? (r.amount_cents / 100).toFixed(2).replace(".", ",") : "", r.status, r.checked_in_guests ? `${r.checked_in_guests}/${r.guest_count}` : "", fmt.format(new Date(r.created_at)), r.admin_note]
       .map(cell)
       .join(";"),
   );

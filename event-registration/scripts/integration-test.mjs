@@ -290,11 +290,12 @@ try {
   await sleep(500);
   check("no n8n notification before payment", !hooks.some((h) => h.body.phone === "+491767000001"));
   const st1 = await fetch(`${BASE}/api/checkout/status?session_id=${s1.id}`).then((r) => r.json());
-  check("status before paying: unpaid", st1.state === "unpaid");
+  check("status before paying: unpaid, no entry QR code yet", st1.state === "unpaid" && !st1.registration.ticketToken);
   paySession(s1.id);
   const st2 = await fetch(`${BASE}/api/checkout/status?session_id=${s1.id}`).then((r) => r.json());
   const [r1b] = await sql`select status, payment_status, amount_cents from registrations where id = ${r1.id}`;
   check("after paying: confirmed, paid 40 €", st2.state === "paid" && st2.registration.paidCents === 4000 && r1b.status === "confirmed" && r1b.payment_status === "paid");
+  check("after paying: entry QR code (64-char ticket code)", /^[a-f0-9]{64}$/.test(st2.registration.ticketToken || ""));
   await sleep(800);
   const paidHook = hooks.find((h) => h.body.phone === "+491767000001");
   check("n8n notified once paid (paid: true, 40 €)", paidHook?.body.paid === true && paidHook?.body.amount_paid_eur === 40, JSON.stringify(paidHook?.body));
@@ -374,6 +375,42 @@ try {
   await sql`update event_settings set min_age = 0 where id = 1`;
   check("min age 0 hides the notice", !(await fetch(BASE + "/").then((r) => r.text())).includes("Einlass ab"));
   await sql`update event_settings set min_age = 18 where id = 1`;
+
+  console.log("Entry tickets (QR) and door");
+  await reset({ max_capacity: 6, waitlist_enabled: true });
+  const t1 = await register({ guestCount: 3 });
+  const tok = t1.data.registration?.ticketToken;
+  check("free reservation → entry QR code returned", t1.status === 201 && /^[a-f0-9]{64}$/.test(tok || ""));
+  const [t1row] = await sql`select ticket_token from registrations where reference = ${t1.data.registration?.reference}`;
+  check("ticket code stored, unique per reservation", t1row?.ticket_token === tok && tok !== (await register({ guestCount: 1 })).data.registration?.ticketToken);
+  const ticketHtml = await fetch(`${BASE}/ticket/${tok}`, { headers: { Cookie: "lang=de" } }).then((r) => r.text());
+  check("ticket page shows the ticket (name, places, QR hint)", ticketHtml.includes("Test Guest") && ticketHtml.includes("3 Personen") && ticketHtml.includes("Er gilt für alle 3 Personen"));
+  check("ticket page is not indexed and shows no phone number", ticketHtml.includes("noindex") && !ticketHtml.includes("+49176"));
+  check("unknown ticket → not found message", (await fetch(`${BASE}/ticket/${"0".repeat(64)}`).then((r) => r.text())).includes("Ticket nicht gefunden"));
+  await sql`update registrations set status = 'cancelled' where ticket_token = ${tok}`;
+  check("cancelled reservation → ticket page says not valid", (await fetch(`${BASE}/ticket/${tok}`).then((r) => r.text())).includes("Dieses Ticket ist nicht gültig"));
+  const wlT = await register({ guestCount: 6, acceptWaitlist: true });
+  check("waiting list → no entry QR code", wlT.data.registration?.status === "waitlisted" && !wlT.data.registration?.ticketToken, JSON.stringify(wlT.data));
+  check("door page asks for sign-in when signed out", (await fetch(`${BASE}/door`).then((r) => r.text())).includes("Einlass"));
+  check("door page does not show guests when signed out", !(await fetch(`${BASE}/door`).then((r) => r.text())).includes("Test Guest"));
+
+  console.log("Tickets at the door (Abendkasse) info");
+  await reset({ max_capacity: 2, waitlist_enabled: false });
+  const homeOpen = await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text());
+  check("not shown while places are free", !homeOpen.includes("Abendkasse"));
+  await register({ guestCount: 2 });
+  const homeFull = await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text());
+  check("sold out → 'ausgebucht' plus Abendkasse info", homeFull.includes("Der Abend ist ausgebucht") && homeFull.includes("Abendkasse") && homeFull.includes("weitere Tickets direkt am Eingang"));
+  await sql`update event_settings set translations = ${sql.json({ en: { door_sales_info: "On the night of the event, more tickets are available at the entrance while places last." } })} where id = 1`;
+  check("Abendkasse info translated (en)", (await fetch(BASE + "/", { headers: { Cookie: "lang=en" } }).then((r) => r.text())).includes("more tickets are available at the entrance"));
+  await sql`update event_settings set waitlist_enabled = true where id = 1`;
+  check("shown with the waiting list too", (await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text())).includes("Abendkasse"));
+  await sql`update event_settings set registration_open = false, waitlist_enabled = false where id = 1`;
+  check("shown when registration is closed", (await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text())).includes("Abendkasse"));
+  const savedDoorText = (await sql`select door_sales_info from event_settings where id = 1`)[0].door_sales_info;
+  await sql`update event_settings set door_sales_info = '' where id = 1`;
+  check("empty text hides it", !(await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text())).includes("Abendkasse"));
+  await sql`update event_settings set door_sales_info = ${savedDoorText}, translations = '{}'::jsonb where id = 1`;
 
   console.log("Public pages");
   for (const p of ["/", "/privacy", "/imprint", "/api/calendar"]) check(`GET ${p} → 200`, (await fetch(BASE + p)).status === 200);

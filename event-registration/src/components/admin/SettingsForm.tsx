@@ -45,10 +45,12 @@ export function SettingsForm({
   initial: v,
   reservedPlaces,
   stripeMode,
+  doorPasswordSet,
 }: {
   initial: Values;
   reservedPlaces: number;
   stripeMode: "test" | "live" | null;
+  doorPasswordSet: boolean;
 }) {
   const [state, action, pending] = useActionState(saveSettingsAction, null);
   return (
@@ -95,6 +97,29 @@ export function SettingsForm({
         <Field label="Show “only X places left” below" hint="0 never shows it.">
           <input name="low_capacity_threshold" type="number" min={0} defaultValue={v.low_capacity_threshold} required className={input} />
         </Field>
+        <Field
+          label="Tickets at the door (Abendkasse)"
+          hint="Shown when online reservations are sold out or closed, e.g. opening time, price, cash only. Empty hides it."
+          wide>
+          <textarea name="door_sales_info" defaultValue={v.door_sales_info} maxLength={1000} rows={3} className={input} />
+        </Field>
+      </Group>
+
+      <Group
+        title="Door check-in"
+        description="Security opens /door on their phone, signs in with this password and scans the guests' QR codes. They see only name, places and ticket type.">
+        <Field
+          label={doorPasswordSet ? "New door password" : "Door password"}
+          hint={
+            doorPasswordSet
+              ? "A password is set. Leave empty to keep it. Setting a new one signs out all door phones."
+              : "Not set yet: only you (signed in here) can use /door. At least 8 characters."
+          }>
+          <input name="door_password" type="text" autoComplete="off" minLength={8} maxLength={100} className={input} />
+        </Field>
+        <div className="text-sm text-thread sm:self-end">
+          Door page: <a href="/door" target="_blank" className="font-semibold underline underline-offset-4">/door</a>
+        </div>
       </Group>
 
       <Group title="Online payment" description="Guests pay on Stripe's secure page; a reservation is confirmed only when the payment arrives.">

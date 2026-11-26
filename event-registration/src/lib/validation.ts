@@ -109,6 +109,7 @@ export const settingsSchema = z.object({
   terms_text: optionalText(20000),
   ticket_normal_info: optionalText(200),
   ticket_vip_info: optionalText(200),
+  door_sales_info: optionalText(1000),
   max_guests_per_registration: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),
   min_age: z.coerce.number().int().min(0).max(99),
   low_capacity_threshold: z.coerce.number().int().min(0).max(100000),

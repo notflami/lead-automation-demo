@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/format";
+import { TicketQr } from "./TicketQr";
 import { dictionaries, type Locale } from "@/lib/i18n";
 
 export type FormMode = "open" | "waitlist" | "full" | "closed";
@@ -25,6 +26,8 @@ interface Confirmation {
   firstName: string;
   eventName: string;
   paidCents?: number;
+  /** Secret code of the entrance QR code (confirmed reservations only). */
+  ticketToken?: string;
 }
 
 const STORAGE_KEY = "reservation:v1";
@@ -61,6 +64,8 @@ export function RegistrationForm(props: {
   /** Event WhatsApp number (E.164) or "" when not set. */
   whatsappNumber: string;
   tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string; priceNormal: number; priceVip: number };
+  /** Text about tickets at the door (Abendkasse), shown when sold out or closed. "" hides it. */
+  doorInfo?: string;
   /** Online payment active (Stripe configured and switched on in Event settings). */
   payment: { enabled: boolean; termsUrl: string | null };
 }) {
@@ -322,6 +327,19 @@ export function RegistrationForm(props: {
           <p className="mt-1 whitespace-nowrap font-sans text-[clamp(1.9rem,9vw,3rem)] font-bold tracking-wide text-kilim tabular-nums">
             {confirmation.reference}
           </p>
+          {!waitlisted && confirmation.ticketToken && (
+            <div className="mt-5 border-t border-ink/15 pt-5">
+              <p className="text-lg font-semibold">{t.ticketQrHeading}</p>
+              <p className="mt-1 text-base text-thread">{t.ticketQrHint(confirmation.guestCount)}</p>
+              <TicketQr path={`/ticket/${confirmation.ticketToken}`} label={`${t.ticketQrHeading} ${confirmation.reference}`} className="mt-4" />
+              <a
+                href={`/ticket/${confirmation.ticketToken}`}
+                className="mt-4 inline-flex min-h-11 items-center font-semibold text-kilim underline underline-offset-4">
+                {t.openTicket}
+              </a>
+              <p className="text-sm text-muted">{t.ticketLinkHint}</p>
+            </div>
+          )}
           <dl className="mt-5 grid gap-x-6 gap-y-3 border-t border-ink/15 pt-5 sm:grid-cols-2">
             <div>
               <dt className="text-base text-muted">{waitlisted ? t.waitlistPlaces : t.reservedPlaces}</dt>
@@ -411,6 +429,7 @@ export function RegistrationForm(props: {
       <div>
         <h3 className="display text-4xl text-ink">{props.mode === "closed" ? t.closedHeading : t.fullHeading}</h3>
         <p className="mt-3 text-lg text-thread">{props.mode === "closed" ? t.closedText : t.fullText}</p>
+        {props.doorInfo && <DoorInfo heading={t.doorSalesHeading} text={props.doorInfo} className="mt-6" />}
       </div>
     );
   }
@@ -422,6 +441,7 @@ export function RegistrationForm(props: {
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
+      {props.mode === "waitlist" && props.doorInfo && <DoorInfo heading={t.doorSalesHeading} text={props.doorInfo} />}
       {formError && (
         <div
           ref={errorRef}
@@ -713,5 +733,14 @@ function Spinner() {
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function DoorInfo({ heading, text, className = "" }: { heading: string; text: string; className?: string }) {
+  return (
+    <div className={`rounded-xl border-l-4 border-saffron bg-saffron/10 px-4 py-3 ${className}`}>
+      <p className="text-lg font-semibold text-ink">{heading}</p>
+      <p className="mt-1 whitespace-pre-line text-base text-thread">{text}</p>
+    </div>
   );
 }
