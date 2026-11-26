@@ -70,6 +70,12 @@ export function SettingsForm({
           hint="When all places are taken, guests can join a waiting list instead."
           defaultChecked={v.waitlist_enabled}
         />
+        <Field label="Online sales start" hint="German time. Before this, the page shows a countdown instead of the form. Empty = open now.">
+          <input name="sales_start_local" type="datetime-local" defaultValue={v.sales_start_local} className={input} />
+        </Field>
+        <Field label="Online sales end" hint="German time. From then on: “Online-Verkauf beendet” and the Abendkasse text. Empty = no end.">
+          <input name="sales_end_local" type="datetime-local" defaultValue={v.sales_end_local} className={input} />
+        </Field>
         <Field label="Maximum capacity (people)" hint={`${reservedPlaces} places are reserved right now.`}>
           <input name="max_capacity" type="number" min={1} max={100000} defaultValue={v.max_capacity} required className={input} />
         </Field>

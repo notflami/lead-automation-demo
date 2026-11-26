@@ -16,6 +16,7 @@ import { adminRegistrationSchema, settingsSchema } from "@/lib/validation";
 import { retryPendingWebhooks } from "@/lib/webhook";
 import { refundAll, refundRegistration } from "@/lib/payments";
 import { hashDoorPassword } from "@/lib/door";
+import { EVENT_TZ } from "@/lib/settings";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | null;
 
@@ -98,6 +99,16 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
   delete raw.price_vip_eur;
   raw.waitlist_enabled = form.get("waitlist_enabled") === "on";
   raw.payments_enabled = form.get("payments_enabled") === "on";
+  // Online sales window, entered as local event time ("YYYY-MM-DDTHH:MM"); empty = no limit.
+  const salesStart = String(form.get("sales_start_local") ?? "").trim();
+  const salesEnd = String(form.get("sales_end_local") ?? "").trim();
+  delete raw.sales_start_local;
+  delete raw.sales_end_local;
+  const localTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+  if ((salesStart && !localTime.test(salesStart)) || (salesEnd && !localTime.test(salesEnd))) {
+    return { error: 'Check the fields "Online sales start/end": choose a date and time.' };
+  }
+  if (salesStart && salesEnd && salesEnd <= salesStart) return { error: "Online sales must end after they start." };
   const doorPassword = String(form.get("door_password") ?? "").trim();
   delete raw.door_password;
   if (doorPassword && (doorPassword.length < 8 || doorPassword.length > 100)) {
@@ -134,7 +145,10 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     ...(doorPassword ? { door_password_hash: hashDoorPassword(doorPassword) } : {}),
   };
   const sql = db();
-  await sql`update event_settings set ${sql(values)} where id = 1`;
+  await sql`update event_settings set ${sql(values)},
+    sales_start = case when ${salesStart} = '' then null else ${salesStart}::timestamp at time zone ${EVENT_TZ} end,
+    sales_end = case when ${salesEnd} = '' then null else ${salesEnd}::timestamp at time zone ${EVENT_TZ} end
+    where id = 1`;
   revalidatePath("/", "layout");
   return {
     ok: true,

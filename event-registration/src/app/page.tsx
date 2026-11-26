@@ -9,7 +9,8 @@ import { formatDayMonth, formatEventDate, formatTimeRange, splitLines } from "@/
 import { issueFormToken } from "@/lib/form-token";
 import { getDict } from "@/lib/locale";
 import { getRemainingPlaces } from "@/lib/registrations";
-import { getSettings, localizeSettings } from "@/lib/settings";
+import { EVENT_TZ, getSettings, localizeSettings } from "@/lib/settings";
+import { LANGUAGES } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,31 @@ export default async function HomePage() {
   const [places, formToken] = await Promise.all([getRemainingPlaces(s.max_capacity, s.vip_capacity), issueFormToken()]);
   const remaining = places.total;
 
-  const mode: FormMode = !s.registration_open ? "closed" : remaining > 0 ? "open" : s.waitlist_enabled ? "waitlist" : "full";
+  const now = Date.now();
+  const beforeSales = s.sales_start !== null && now < s.sales_start.getTime();
+  const afterSales = s.sales_end !== null && now >= s.sales_end.getTime();
+  const mode: FormMode = !s.registration_open
+    ? "closed"
+    : beforeSales
+      ? "upcoming"
+      : afterSales
+        ? "ended"
+        : remaining > 0
+          ? "open"
+          : s.waitlist_enabled
+            ? "waitlist"
+            : "full";
+  const salesStartText =
+    beforeSales && s.sales_start
+      ? new Intl.DateTimeFormat(LANGUAGES.find((l) => l.code === locale)?.intl ?? "de-DE", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: EVENT_TZ,
+        }).format(s.sales_start)
+      : "";
   const dateText = formatEventDate(s.event_date, locale);
   const dm = formatDayMonth(s.event_date, locale);
   const timeText = formatTimeRange(s.start_time, s.end_time, locale);
@@ -113,6 +138,7 @@ export default async function HomePage() {
                 siteUrl={env.siteUrl()}
                 whatsappNumber={s.whatsapp_number}
                 doorInfo={s.door_sales_info.trim()}
+                sales={beforeSales && s.sales_start ? { startIso: s.sales_start.toISOString(), startText: salesStartText, serverNow: now } : undefined}
                 payment={{ enabled: s.payments_enabled && stripeConfigured(), termsUrl: s.terms_text.trim() ? "/terms" : null }}
                 tickets={{
                   vipEnabled: s.vip_capacity > 0,

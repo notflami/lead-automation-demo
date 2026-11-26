@@ -126,7 +126,7 @@ async function reset(settings) {
   await sql`truncate registrations, rate_limit_hits`;
   await sql`alter sequence registration_number_seq restart 1`;
   await sql`update event_settings set registration_open = true, waitlist_enabled = false, max_capacity = 20,
-            vip_capacity = 20, max_guests_per_registration = 8, payments_enabled = false where id = 1`;
+            vip_capacity = 20, max_guests_per_registration = 8, payments_enabled = false, sales_start = null, sales_end = null where id = 1`;
   if (settings) await sql`update event_settings set ${sql(settings)} where id = 1`;
 }
 const reserved = async () =>
@@ -411,6 +411,23 @@ try {
   await sql`update event_settings set door_sales_info = '' where id = 1`;
   check("empty text hides it", !(await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text())).includes("Abendkasse"));
   await sql`update event_settings set door_sales_info = ${savedDoorText}, translations = '{}'::jsonb where id = 1`;
+
+  console.log("Online sales window");
+  await reset({ max_capacity: 50 });
+  await sql`update event_settings set sales_start = now() + interval '2 days 3 hours', sales_end = now() + interval '4 days' where id = 1`;
+  const preSale = await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text());
+  check("before the start: countdown instead of the form", preSale.includes("Ticketverkauf startet in") && preSale.includes('role="timer"') && !preSale.includes("Vor- und Nachname"));
+  check("countdown shows the start date", /Start:.*Uhr|Start:.*\d{2}:\d{2}/.test(preSale.replace(/<[^>]+>/g, "")));
+  check("countdown translated (sq)", (await fetch(BASE + "/", { headers: { Cookie: "lang=sq" } }).then((r) => r.text())).includes("Shitja e biletave fillon për"));
+  check("before the start: booking refused by the server", (await register({ guestCount: 1 })).data.error === "closed");
+  await sql`update event_settings set sales_start = now() - interval '1 minute' where id = 1`;
+  check("after the start: form shown", (await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text())).includes("Vor- und Nachname"));
+  check("after the start: booking accepted", (await register({ guestCount: 1 })).status === 201);
+  await sql`update event_settings set sales_end = now() - interval '1 second' where id = 1`;
+  const postSale = await fetch(BASE + "/", { headers: { Cookie: "lang=de" } }).then((r) => r.text());
+  check("after the end: 'Online-Verkauf beendet' + Abendkasse", postSale.includes("Der Online-Verkauf ist beendet") && postSale.includes("Abendkasse") && !postSale.includes("Vor- und Nachname"));
+  check("after the end: booking refused by the server", (await register({ guestCount: 1 })).data.error === "closed");
+  await sql`update event_settings set sales_start = null, sales_end = null where id = 1`;
 
   console.log("Public pages");
   for (const p of ["/", "/privacy", "/imprint", "/api/calendar"]) check(`GET ${p} → 200`, (await fetch(BASE + p)).status === 200);
