@@ -4,6 +4,7 @@ import { SettingsForm } from "@/components/admin/SettingsForm";
 import { requireAdmin } from "@/lib/auth";
 import { getStats } from "@/lib/registrations";
 import { getSettings } from "@/lib/settings";
+import { doorPasswordHash } from "@/lib/door";
 import { stripeMode } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,13 @@ const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currenc
 
 export default async function SettingsPage() {
   await requireAdmin();
-  const [s, stats] = await Promise.all([getSettings(), getStats()]);
+  const [s, stats, doorHash] = await Promise.all([getSettings(), getStats(), doorPasswordHash()]);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { updated_at, ...values } = s;
   return (
     <div className="space-y-6">
       <h1 className="display text-3xl text-ink">Event settings</h1>
-      <SettingsForm initial={values} reservedPlaces={stats.reservedPlaces} stripeMode={stripeMode()} />
+      <SettingsForm initial={values} reservedPlaces={stats.reservedPlaces} stripeMode={stripeMode()} doorPasswordSet={doorHash !== ""} />
       {(s.payments_enabled || stats.paidRegistrations > 0) && (
         <section className="rounded-xl border border-kilim/25 bg-white p-5">
           <h2 className="font-semibold text-ink">Cancel the event: refund everyone</h2>

@@ -112,6 +112,7 @@ export default async function HomePage() {
                 formToken={formToken}
                 siteUrl={env.siteUrl()}
                 whatsappNumber={s.whatsapp_number}
+                doorInfo={s.door_sales_info.trim()}
                 payment={{ enabled: s.payments_enabled && stripeConfigured(), termsUrl: s.terms_text.trim() ? "/terms" : null }}
                 tickets={{
                   vipEnabled: s.vip_capacity > 0,

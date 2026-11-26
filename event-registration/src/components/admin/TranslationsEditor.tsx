@@ -12,8 +12,9 @@ const LABELS: Record<TranslatableField, string> = {
   additional_info: "Good to know",
   ticket_normal_info: "Normal ticket: short info",
   ticket_vip_info: "VIP place: short info",
+  door_sales_info: "Tickets at the door (shown when sold out)",
 };
-const MULTILINE: TranslatableField[] = ["about_text", "expectations", "additional_info"];
+const MULTILINE: TranslatableField[] = ["about_text", "expectations", "additional_info", "door_sales_info"];
 
 /** One tab per language. All tabs stay in the form (hidden ones too), so one Save stores everything. */
 export function TranslationsEditor({ v }: { v: Omit<EventSettings, "updated_at"> }) {

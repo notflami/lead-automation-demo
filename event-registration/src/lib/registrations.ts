@@ -15,7 +15,7 @@ export type CreateResult =
 const REG_COLUMNS = `id, reference, full_name, phone, email, guest_count, ticket_type, status, locale, admin_note,
   created_at, updated_at, cancelled_at, anonymized_at, webhook_status, webhook_attempts,
   webhook_last_error, webhook_sent_at, payment_status, amount_cents, stripe_session_id, checkout_url,
-  hold_expires_at, paid_at, stripe_payment_intent, refunded_at, refund_error`;
+  hold_expires_at, paid_at, stripe_payment_intent, refunded_at, refund_error, ticket_token, checked_in_guests, checked_in_at`;
 
 /** Places taken: confirmed, checked in, and still-valid payment holds. */
 const SEATED = `(status in ('confirmed', 'checked_in') or (status = 'pending_payment' and hold_expires_at > now()))`;
@@ -145,7 +145,7 @@ export async function getStats(): Promise<CapacityStats> {
       select
         count(*) filter (where status in ('confirmed', 'checked_in'))::int                         as registrations,
         coalesce(sum(guest_count) filter (where status in ('confirmed', 'checked_in')), 0)::int     as reserved,
-        coalesce(sum(guest_count) filter (where status = 'checked_in'), 0)::int                     as checked_in,
+        coalesce(sum(checked_in_guests), 0)::int                                                    as checked_in,
         count(*) filter (where status = 'waitlisted')::int                                         as wl_regs,
         coalesce(sum(guest_count) filter (where status = 'waitlisted'), 0)::int                     as wl_places,
         count(*) filter (where status = 'cancelled')::int                                          as cancelled,
@@ -272,6 +272,10 @@ export async function updateRegistration(
         full_name = ${patch.fullName}, phone = ${patch.phone}, email = ${patch.email},
         guest_count = ${patch.guestCount}, ticket_type = ${patch.ticketType}, status = ${patch.status}, admin_note = ${patch.adminNote},
         cancelled_at = case when ${patch.status} = 'cancelled' then coalesce(cancelled_at, now()) else null end,
+        checked_in_guests = case when ${patch.status} <> 'checked_in' then 0
+                                 when checked_in_guests between 1 and ${patch.guestCount} then checked_in_guests
+                                 else ${patch.guestCount} end,
+        checked_in_at = case when ${patch.status} = 'checked_in' then coalesce(checked_in_at, now()) else null end,
         updated_at = now()
       where id = ${id}`;
     return { ok: true };

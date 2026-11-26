@@ -6,7 +6,7 @@ import { TRANSLATABLE_FIELDS, type EventSettings } from "./types";
 const COLUMNS = `event_name, tagline, to_char(event_date, 'YYYY-MM-DD') as event_date,
   to_char(start_time, 'HH24:MI') as start_time, to_char(end_time, 'HH24:MI') as end_time,
   venue_name, venue_address, venue_map_url, about_text, expectations, dress_code, additional_info,
-  max_capacity, vip_capacity, price_normal_cents, price_vip_cents, payments_enabled, terms_text, ticket_normal_info, ticket_vip_info, max_guests_per_registration, min_age, low_capacity_threshold, registration_open, waitlist_enabled,
+  max_capacity, vip_capacity, price_normal_cents, price_vip_cents, payments_enabled, terms_text, ticket_normal_info, ticket_vip_info, door_sales_info, max_guests_per_registration, min_age, low_capacity_threshold, registration_open, waitlist_enabled,
   contact_email, contact_phone, whatsapp_number, organizer_name, organizer_address, privacy_notes, data_retention_days, translations, updated_at`;
 
 /** Loaded once per request, even when the layout, metadata and page all need it. */

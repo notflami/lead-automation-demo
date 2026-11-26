@@ -94,6 +94,8 @@ export async function POST(req: NextRequest) {
           ticketType: r.ticket_type,
           status: r.status,
           firstName: r.full_name.split(" ")[0],
+          // Entrance QR code (one per reservation); none while on the waiting list.
+          ticketToken: r.status === "confirmed" ? r.ticket_token : undefined,
         },
       },
       result.duplicate ? 200 : 201,

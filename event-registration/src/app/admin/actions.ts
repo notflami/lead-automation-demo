@@ -15,6 +15,7 @@ import { LOCALES, type Locale } from "@/lib/i18n";
 import { adminRegistrationSchema, settingsSchema } from "@/lib/validation";
 import { retryPendingWebhooks } from "@/lib/webhook";
 import { refundAll, refundRegistration } from "@/lib/payments";
+import { hashDoorPassword } from "@/lib/door";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | null;
 
@@ -97,6 +98,11 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
   delete raw.price_vip_eur;
   raw.waitlist_enabled = form.get("waitlist_enabled") === "on";
   raw.payments_enabled = form.get("payments_enabled") === "on";
+  const doorPassword = String(form.get("door_password") ?? "").trim();
+  delete raw.door_password;
+  if (doorPassword && (doorPassword.length < 8 || doorPassword.length > 100)) {
+    return { error: 'Check the field "Door password": use at least 8 characters.' };
+  }
   const parsed = settingsSchema.safeParse(raw);
   if (!parsed.success) {
     const i = parsed.error.issues[0];
@@ -125,11 +131,17 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
     start_time: s.start_time || null,
     end_time: s.end_time || null,
     updated_at: new Date(),
+    ...(doorPassword ? { door_password_hash: hashDoorPassword(doorPassword) } : {}),
   };
   const sql = db();
   await sql`update event_settings set ${sql(values)} where id = 1`;
   revalidatePath("/", "layout");
-  return { ok: true, message: "Event settings saved. The public page shows them now." };
+  return {
+    ok: true,
+    message: doorPassword
+      ? "Event settings saved. New door password set: door phones must sign in again."
+      : "Event settings saved. The public page shows them now.",
+  };
 }
 
 export async function anonymizeAllAction(_: ActionState, form: FormData): Promise<ActionState> {

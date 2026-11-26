@@ -14,6 +14,7 @@ export const TRANSLATABLE_FIELDS = [
   "additional_info",
   "ticket_normal_info",
   "ticket_vip_info",
+  "door_sales_info",
 ] as const;
 export type TranslatableField = (typeof TRANSLATABLE_FIELDS)[number];
 
@@ -38,6 +39,7 @@ export interface EventSettings {
   terms_text: string;
   ticket_normal_info: string;
   ticket_vip_info: string;
+  door_sales_info: string;
   max_guests_per_registration: number;
   min_age: number;
   low_capacity_threshold: number;
@@ -83,6 +85,9 @@ export interface Registration {
   stripe_payment_intent: string | null;
   refunded_at: Date | null;
   refund_error: string | null;
+  ticket_token: string;
+  checked_in_guests: number;
+  checked_in_at: Date | null;
 }
 
 export interface CapacityStats {

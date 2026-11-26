@@ -244,6 +244,29 @@ payouts back to automatic).
 
 ---
 
+## Part 4c: Entry tickets (QR code) and door check-in
+
+Every confirmed reservation gets **one QR code**, valid for all its places. Guests see it right after reserving or paying, and on their personal ticket link (button "Ticket-Link öffnen"). Waiting-list and unpaid reservations get no QR code.
+
+**Set up (2 minutes):**
+1. Dashboard → **Event settings** → **Door check-in** → enter a door password (at least 8 characters) → **Save settings**.
+2. Give security the address **`<your site>/door`** and the password. Nothing to install: it runs in the phone's browser (Chrome on Android, Safari on iPhone).
+
+**At the entrance:**
+1. Open `/door`, sign in, tap **Kamera starten** and allow the camera.
+2. Point the camera at the guest's QR code:
+   - **GÜLTIG (green):** check the ID (name and age), choose how many people of the group enter now, tap **… einlassen**.
+   - **BEREITS EINGELASSEN / UNGÜLTIG / NICHT BEZAHLT (red):** do not admit; the reason is shown.
+3. Tap **Nächster Gast**. If a group arrives in parts, the same QR code admits the rest later.
+4. Guest without a phone: type the **REG number** or the **name** into the search field.
+5. Mistake? Tap **Rückgängig** right after admitting.
+
+Several phones can scan at the same time; one QR code can never admit more people than were booked. The counter "Drinnen" shows people admitted from online reservations (door sales are not counted). The door phones need mobile internet. As a backup, download the CSV list before the event.
+
+**Security:** door staff see only name, REG number, number of places and ticket type (no phone numbers). Setting a new door password signs out all door phones. If a guest lost their QR code, open their reservation in the dashboard → **Open ticket** and send them the link.
+
+**Tickets at the door (Abendkasse):** the text in Event settings → "Tickets at the door" is shown on the website when online reservations are sold out or closed (translations under "Translations of your texts").
+
 ## Part 5: Final test before sharing (10 minutes)
 
 On your **phone**, using mobile data (not Wi-Fi):

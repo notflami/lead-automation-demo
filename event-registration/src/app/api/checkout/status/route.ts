@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
         status: paid ? "confirmed" : registration.status,
         firstName: registration.full_name.split(" ")[0],
         paidCents: paid ? registration.amount_cents : 0,
+        ticketToken: paid ? registration.ticket_token : undefined,
       },
     },
     { headers: { "Cache-Control": "no-store" } },
