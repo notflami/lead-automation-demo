@@ -5,6 +5,7 @@ export const STATUS_LABEL: Record<RegistrationStatus, string> = {
   waitlisted: "Waiting list",
   checked_in: "Checked in",
   cancelled: "Cancelled",
+  pending_payment: "Awaiting payment",
 };
 
 const STYLE: Record<RegistrationStatus, string> = {
@@ -12,6 +13,7 @@ const STYLE: Record<RegistrationStatus, string> = {
   waitlisted: "bg-[#fbefd6] text-[#7a4d00]",
   checked_in: "bg-[#dcf1e8] text-[#155c41]",
   cancelled: "bg-[#ecebe8] text-[#5d5f73] line-through decoration-1",
+  pending_payment: "bg-[#e6eef7] text-[#2d4a6b]",
 };
 
 const ICON: Record<RegistrationStatus, string> = {
@@ -19,6 +21,7 @@ const ICON: Record<RegistrationStatus, string> = {
   waitlisted: "M12 7v5l3 2M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z",
   checked_in: "M4 12.5l4 4 8-8M11 16.5l1 0 8-8",
   cancelled: "M6 6l12 12M18 6L6 18",
+  pending_payment: "M3 7h18v10H3zM3 11h18",
 };
 
 export function StatusBadge({ status }: { status: RegistrationStatus }) {
@@ -39,6 +42,17 @@ export function VipBadge() {
         <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
       </svg>
       VIP
+    </span>
+  );
+}
+
+export function PaidBadge({ label = "Paid" }: { label?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[#dcf1e8] px-2 py-0.5 text-xs font-semibold text-[#155c41]">
+      <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+        <path d="M5 12.5l4 4 10-10" />
+      </svg>
+      {label}
     </span>
   );
 }

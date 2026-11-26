@@ -62,13 +62,25 @@ export default async function OverviewPage() {
 
       <section className="rounded-xl bg-white p-5">
         <CapacityMeter stats={stats} />
-        {(s.price_normal_cents > 0 || s.price_vip_cents > 0) && (
+        {s.payments_enabled && (
+          <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
+            Paid online: <span className="font-semibold text-ink tabular-nums">{euro(stats.paidCents)}</span> from {stats.paidRegistrations}{" "}
+            {stats.paidRegistrations === 1 ? "reservation" : "reservations"}.
+            {stats.pendingPaymentRegistrations > 0 && (
+              <>
+                {" "}
+                Awaiting payment right now: {euro(stats.pendingPaymentCents)} ({stats.pendingPaymentRegistrations}, places held for up to 35 minutes).
+              </>
+            )}
+          </p>
+        )}
+        {!s.payments_enabled && (s.price_normal_cents > 0 || s.price_vip_cents > 0) && (
           <p className="mt-4 border-t border-ink/8 pt-3 text-sm text-thread">
             Value of reserved tickets:{" "}
             <span className="font-semibold text-ink tabular-nums">
               {euro((stats.reservedPlaces - stats.vipReservedPlaces) * s.price_normal_cents + stats.vipReservedPlaces * s.price_vip_cents)}
             </span>{" "}
-            ({stats.reservedPlaces - stats.vipReservedPlaces} × {euro(s.price_normal_cents)} normal, {stats.vipReservedPlaces} × {euro(s.price_vip_cents)} VIP). Not paid online yet.
+            ({stats.reservedPlaces - stats.vipReservedPlaces} × {euro(s.price_normal_cents)} normal, {stats.vipReservedPlaces} × {euro(s.price_vip_cents)} VIP). Online payment is switched off.
           </p>
         )}
         {stats.vipCapacity > 0 && (

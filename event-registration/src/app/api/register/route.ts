@@ -6,6 +6,8 @@ import { createRegistration } from "@/lib/registrations";
 import { getSettings } from "@/lib/settings";
 import { validateRegistration } from "@/lib/validation";
 import { deliverRegistrationWebhook, retryPendingWebhooks } from "@/lib/webhook";
+import { cancelPendingByKey, createCheckout, expireCheckouts } from "@/lib/payments";
+import { stripeConfigured } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +48,9 @@ export async function POST(req: NextRequest) {
     if (!v.ok) return json({ ok: false, error: "validation", fields: v.errors }, 400);
 
     // 3–4. Save atomically (capacity + duplicate checks under lock) and get the REG id.
-    const result = await createRegistration(v.data);
+    const unitPriceCents = v.data.ticketType === "vip" ? settings.price_vip_cents : settings.price_normal_cents;
+    const paymentRequired = settings.payments_enabled && stripeConfigured() && unitPriceCents > 0;
+    const result = await createRegistration(v.data, { required: paymentRequired, unitPriceCents });
     if (!result.ok) {
       if (result.reason === "phone_taken") return json({ ok: false, error: "phone_taken" }, 409);
       return json(
@@ -56,6 +60,22 @@ export async function POST(req: NextRequest) {
     }
 
     const r = result.registration;
+    if (result.replacedSessions.length) after(() => expireCheckouts(result.replacedSessions));
+
+    // Paid ticket: send the guest to Stripe; the reservation is confirmed when the payment arrives.
+    if (r.status === "pending_payment") {
+      if (r.checkout_url) return json({ ok: true, payment: { url: r.checkout_url } }); // same form sent twice
+      try {
+        const ticketLabel = r.ticket_type === "vip" ? "VIP" : "Ticket";
+        const checkout = await createCheckout(r, { eventName: settings.event_name, ticketLabel, unitPriceCents });
+        return json({ ok: true, payment: { url: checkout.url } });
+      } catch (err) {
+        console.error("[register] Stripe checkout failed", err);
+        await cancelPendingByKey(v.data.idempotencyKey);
+        return json({ ok: false, error: "payment_unavailable" }, 503);
+      }
+    }
+
     // 5. n8n webhook — runs after the response is sent; failures are recorded and retried.
     if (!result.duplicate) {
       after(async () => {

@@ -24,9 +24,12 @@ interface Confirmation {
   status: "confirmed" | "waitlisted";
   firstName: string;
   eventName: string;
+  paidCents?: number;
 }
 
 const STORAGE_KEY = "reservation:v1";
+/** Form key of a reservation waiting for payment on Stripe (to release it if the guest comes back without paying). */
+const PENDING_KEY = "reservation:pending";
 type FieldName = "fullName" | "phone" | "guestCount" | "ticketType";
 
 function newKey() {
@@ -58,6 +61,8 @@ export function RegistrationForm(props: {
   /** Event WhatsApp number (E.164) or "" when not set. */
   whatsappNumber: string;
   tickets: { vipEnabled: boolean; vipAvailable: number; normalInfo: string; vipInfo: string; priceNormal: number; priceVip: number };
+  /** Online payment active (Stripe configured and switched on in Event settings). */
+  payment: { enabled: boolean; termsUrl: string | null };
 }) {
   const t = dictionaries[props.locale];
   const id = useId();
@@ -71,6 +76,8 @@ export function RegistrationForm(props: {
   const [formError, setFormError] = useState<string | null>(null);
   const [waitlistOffer, setWaitlistOffer] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [info, setInfo] = useState<string | null>(null);
   const keyRef = useRef<string>("");
   const tokenRef = useRef(props.formToken);
   const resultRef = useRef<HTMLHeadingElement>(null);
@@ -78,9 +85,55 @@ export function RegistrationForm(props: {
 
   useEffect(() => {
     keyRef.current = newKey();
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const sessionId = params.get("session_id");
+    if (checkout) window.history.replaceState(null, "", window.location.pathname + window.location.hash);
+    const forgetPending = () => {
+      try {
+        localStorage.removeItem(PENDING_KEY);
+      } catch {}
+    };
+
+    if (checkout === "success" && sessionId) {
+      // Back from Stripe: ask the server (which asks Stripe) whether the payment went through.
+      fetch(`/api/checkout/status?session_id=${encodeURIComponent(sessionId)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.ok && d.state === "paid") {
+            const c: Confirmation = { ...d.registration, status: "confirmed", eventName: props.event.name };
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(c));
+            } catch {}
+            forgetPending();
+            setConfirmation(c);
+          } else if (d.ok && d.state === "processing") {
+            setInfo(dictionaries[props.locale].paymentProcessing);
+          } else {
+            setFormError(dictionaries[props.locale].paymentCancelled);
+          }
+        })
+        .catch(() => setFormError(dictionaries[props.locale].errors.network));
+      return;
+    }
+    if (checkout === "cancelled") {
+      // Back from Stripe without paying: release the held places right away.
+      try {
+        const pending = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
+        if (pending?.key)
+          fetch("/api/checkout/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idempotencyKey: pending.key }),
+          }).catch(() => {});
+      } catch {}
+      forgetPending();
+      setFormError(dictionaries[props.locale].paymentCancelled);
+      return;
+    }
     const stored = readStored(props.event.name);
     if (stored) setConfirmation(stored);
-  }, [props.event.name]);
+  }, [props.event.name, props.locale]);
 
   // Remove a field's error as soon as the visitor corrects it, so stale red text never lingers.
   const clearError = (f: FieldName) => setErrors((e) => (e[f] ? { ...e, [f]: undefined } : e));
@@ -89,6 +142,7 @@ export function RegistrationForm(props: {
   const priceOf = (type: "normal" | "vip") => (type === "vip" ? props.tickets.priceVip : props.tickets.priceNormal);
   const price = (cents: number) => formatPrice(cents, props.locale);
   const isWaitlist = props.mode === "waitlist" || waitlistOffer;
+  const payNow = props.payment.enabled && priceOf(ticket) > 0 && !isWaitlist;
 
   function fieldMessage(code: string): string {
     const e = t.errors as Record<string, unknown>;
@@ -127,6 +181,16 @@ export function RegistrationForm(props: {
       return;
     }
     const data = await res.json().catch(() => ({}) as Record<string, never>);
+
+    if (res.ok && data.ok && data.payment?.url) {
+      // Paid ticket: places are held; continue on Stripe's secure payment page.
+      try {
+        localStorage.setItem(PENDING_KEY, JSON.stringify({ key: keyRef.current }));
+      } catch {}
+      setRedirecting(true);
+      window.location.assign(data.payment.url);
+      return;
+    }
 
     if (res.ok && data.ok) {
       const c: Confirmation = { ...data.registration, eventName: props.event.name };
@@ -179,6 +243,9 @@ export function RegistrationForm(props: {
       case "closed":
         setFormError(t.errors.closed);
         break;
+      case "payment_unavailable":
+        setFormError(t.errors.payment_unavailable);
+        break;
       case "vip_full":
         setErrors({ ticketType: t.errors.vip_full });
         setFormError(t.errors.vip_full);
@@ -228,6 +295,7 @@ export function RegistrationForm(props: {
     setPhone("");
     setGuests(1);
     setTicket("normal");
+    setInfo(null);
     setErrors({});
     setFormError(null);
   }
@@ -272,7 +340,17 @@ export function RegistrationForm(props: {
                 </dd>
               </div>
             )}
-            {!waitlisted && priceOf(confirmation.ticketType ?? "normal") > 0 && (
+            {(confirmation.paidCents ?? 0) > 0 ? (
+              <div>
+                <dt className="text-base text-muted">{t.paid}</dt>
+                <dd className="flex items-center gap-2 text-xl font-semibold tabular-nums text-moss">
+                  <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                    <path d="M5 12.5l4 4 10-10" />
+                  </svg>
+                  {price(confirmation.paidCents ?? 0)}
+                </dd>
+              </div>
+            ) : !waitlisted && priceOf(confirmation.ticketType ?? "normal") > 0 && (
               <div>
                 <dt className="text-base text-muted">{t.total}</dt>
                 <dd className="text-xl font-semibold tabular-nums">
@@ -352,6 +430,12 @@ export function RegistrationForm(props: {
           className="rounded-xl border-l-4 border-kilim bg-kilim/8 px-4 py-3 text-base font-medium text-kilim-dark outline-none"
         >
           {formError}
+        </div>
+      )}
+
+      {info && (
+        <div role="status" className="rounded-xl border-l-4 border-saffron bg-saffron/10 px-4 py-3 text-base font-medium text-ink">
+          {info}
         </div>
       )}
 
@@ -525,13 +609,19 @@ export function RegistrationForm(props: {
         </Link>
       </p>
 
-      <button type="submit" className="btn-primary w-full text-xl" disabled={submitting} aria-busy={submitting}>
-        {submitting ? (
+      <button type="submit" className="btn-primary w-full text-xl" disabled={submitting || redirecting} aria-busy={submitting || redirecting}>
+        {redirecting ? (
+          <>
+            <Spinner /> {t.redirecting}
+          </>
+        ) : submitting ? (
           <>
             <Spinner /> {t.submitting}
           </>
         ) : isWaitlist ? (
           t.submitWaitlist
+        ) : payNow ? (
+          <span className="text-center">{t.buyNow(price(priceOf(ticket) * guests))}</span>
         ) : (
           <span className="text-center">
             {ticket === "vip" ? t.submitVipPlaces(guests) : t.submitPlaces(guests)}
@@ -541,6 +631,25 @@ export function RegistrationForm(props: {
           </span>
         )}
       </button>
+      {payNow && (
+        <p className="-mt-2 flex gap-2 text-sm leading-relaxed text-muted">
+          <svg viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <rect x="5" y="11" width="14" height="9" rx="2" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+          <span>
+            {t.paymentNotice}
+            {props.payment.termsUrl && (
+              <>
+                {" "}
+                <Link href={props.payment.termsUrl} target="_blank" className="font-semibold text-ink underline underline-offset-4">
+                  {t.termsLink}
+                </Link>
+              </>
+            )}
+          </span>
+        </p>
+      )}
       <WhatsAppLink number={props.whatsappNumber} label={t.whatsappQuestion} message={`Hallo! Ich habe eine Frage zur Veranstaltung „${props.event.name}“${props.event.dateTextDe ? ` am ${props.event.dateTextDe}` : ""}.`} />
     </form>
   );

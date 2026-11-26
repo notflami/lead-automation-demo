@@ -8,6 +8,8 @@ import { getRegistration } from "@/lib/registrations";
 
 export const dynamic = "force-dynamic";
 
+const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+
 const HOOK_LABEL = { pending: "Waiting to be sent", sent: "Delivered", failed: "Failed, will retry", skipped: "Not configured" };
 
 export default async function RegistrationDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -74,6 +76,27 @@ export default async function RegistrationDetail({ params }: { params: Promise<{
               <dt className="text-sm text-muted">Language used</dt>
               <dd>{r.locale === "de" ? "German" : "English"}</dd>
             </div>
+            {r.payment_status !== "none" && (
+              <div>
+                <dt className="text-sm text-muted">Online payment</dt>
+                <dd>
+                  {r.payment_status === "paid" && (
+                    <>
+                      Paid {euro(r.amount_cents)}
+                      {r.paid_at && <span className="text-muted"> on {formatDateTime(r.paid_at)}</span>}
+                    </>
+                  )}
+                  {r.payment_status === "pending" && r.hold_expires_at && <>Awaiting payment until {formatDateTime(r.hold_expires_at)}</>}
+                  {r.payment_status === "expired" && "Not paid (payment page closed or expired)"}
+                  {r.payment_status === "failed" && "Payment failed"}
+                  {r.payment_status === "refunded" && "Refunded"}
+                  {r.stripe_session_id && <span className="mt-1 block font-mono text-xs break-all text-muted">{r.stripe_session_id}</span>}
+                  {r.payment_status === "paid" && (
+                    <span className="mt-1 block text-sm text-muted">Refunds: Stripe dashboard → Payments → open the payment → Refund.</span>
+                  )}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm text-muted">Sent to n8n</dt>
               <dd>

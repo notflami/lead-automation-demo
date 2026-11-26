@@ -95,6 +95,7 @@ export async function saveSettingsAction(_: ActionState, form: FormData): Promis
   delete raw.price_normal_eur;
   delete raw.price_vip_eur;
   raw.waitlist_enabled = form.get("waitlist_enabled") === "on";
+  raw.payments_enabled = form.get("payments_enabled") === "on";
   const parsed = settingsSchema.safeParse(raw);
   if (!parsed.success) {
     const i = parsed.error.issues[0];

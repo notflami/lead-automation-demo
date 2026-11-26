@@ -59,6 +59,13 @@ export function SiteFooter({ s, t }: { s: EventSettings; t: Dict }) {
                 {t.imprint}
               </Link>
             </li>
+            {s.terms_text.trim() && (
+              <li>
+                <Link className="underline-offset-4 hover:underline" href="/terms">
+                  {t.termsLink}
+                </Link>
+              </li>
+            )}
           </ul>
         </nav>
       </div>

@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import { SignJWT } from "jose";
+import Stripe from "stripe";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 for (const f of [".env.local", ".env"]) if (fs.existsSync(path.join(root, f))) process.loadEnvFile(path.join(root, f));
@@ -36,6 +37,51 @@ const mock = http
     });
   })
   .listen(5678);
+
+// ---- mock Stripe API (STRIPE_API_URL=http://localhost:12111 in the server's env) --
+const sessions = new Map();
+let stripeDown = false;
+const stripeMock = http
+  .createServer((req, res) => {
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => {
+      const send = (code, obj) => {
+        res.writeHead(code, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(obj));
+      };
+      if (stripeDown) return send(500, { error: { type: "api_error", message: "mock outage" } });
+      const f = new URLSearchParams(b);
+      const m = req.url.match(/^\/v1\/checkout\/sessions(?:\/([^/?]+))?(\/expire)?/);
+      if (!m) return send(404, { error: { message: "not mocked" } });
+      if (req.method === "POST" && !m[1]) {
+        const id = "cs_test_" + crypto.randomBytes(8).toString("hex");
+        const s = {
+          id, object: "checkout.session", status: "open", payment_status: "unpaid", url: `https://checkout.example/${id}`,
+          amount_total: Number(f.get("line_items[0][price_data][unit_amount]")) * Number(f.get("line_items[0][quantity]")),
+          client_reference_id: f.get("client_reference_id"), metadata: { registration_id: f.get("metadata[registration_id]") },
+          expires_at: Number(f.get("expires_at")), success_url: f.get("success_url"), locale: f.get("locale"),
+        };
+        sessions.set(id, s);
+        return send(200, s);
+      }
+      const s = sessions.get(m[1]);
+      if (!s) return send(404, { error: { message: "No such session" } });
+      if (m[2]) {
+        if (s.status === "open") s.status = "expired";
+        return send(200, s);
+      }
+      return send(200, s);
+    });
+  })
+  .listen(12111);
+const paySession = (id) => Object.assign(sessions.get(id), { status: "complete", payment_status: "paid" });
+const stripeSdk = new Stripe("sk_test_local_mock");
+async function stripeEvent(type, session, secret = process.env.STRIPE_WEBHOOK_SECRET) {
+  const payload = JSON.stringify({ id: "evt_" + crypto.randomBytes(6).toString("hex"), object: "event", type, data: { object: session } });
+  const header = stripeSdk.webhooks.generateTestHeaderString({ payload, secret });
+  return fetch(BASE + "/api/stripe/webhook", { method: "POST", headers: { "Content-Type": "application/json", "Stripe-Signature": header }, body: payload });
+}
 
 // ---- helpers ---------------------------------------------------------------
 let passed = 0;
@@ -73,7 +119,7 @@ async function reset(settings) {
   await sql`truncate registrations, rate_limit_hits`;
   await sql`alter sequence registration_number_seq restart 1`;
   await sql`update event_settings set registration_open = true, waitlist_enabled = false, max_capacity = 20,
-            vip_capacity = 20, max_guests_per_registration = 8 where id = 1`;
+            vip_capacity = 20, max_guests_per_registration = 8, payments_enabled = false where id = 1`;
   if (settings) await sql`update event_settings set ${sql(settings)} where id = 1`;
 }
 const reserved = async () =>
@@ -223,6 +269,90 @@ try {
   const vipHook = hooks.find((x) => x.body.registration_id === vipReg.data.registration?.reference);
   check("webhook carries ticket value (3 × 30 € = 90)", vipHook?.body.amount_eur === 90 && vipHook?.body.ticket_type === "vip", JSON.stringify(vipHook?.body));
 
+  console.log("Online payment (Stripe mock)");
+  await reset({ max_capacity: 4, payments_enabled: true, price_normal_cents: 2000, price_vip_cents: 3000, vip_capacity: 4 });
+  hooks.length = 0;
+  const key1 = crypto.randomUUID();
+  const p1 = await register({ guestCount: 2, phone: "0176 7000001", idempotencyKey: key1 });
+  const [r1] = await sql`select * from registrations where idempotency_key = ${key1}`;
+  const s1 = sessions.get(r1?.stripe_session_id);
+  check("paid ticket: guest gets a Stripe checkout link, places held", p1.status === 200 && p1.data.payment?.url === s1?.url && r1.status === "pending_payment" && r1.payment_status === "pending");
+  check("checkout amount = 2 × 20 € and checkout page in the guest's language (en)", s1?.amount_total === 4000 && s1?.locale === "en" && /checkout=success&session_id=\{CHECKOUT_SESSION_ID\}/.test(s1?.success_url));
+  check("same form sent twice → same checkout link", (await register({ guestCount: 2, phone: "0176 7000001", idempotencyKey: key1 })).data.payment?.url === s1?.url);
+  check("held places count: 3 more on capacity 4 → not enough", (await register({ guestCount: 3, phone: "0176 7000002" })).data.error === "not_enough");
+  await sleep(500);
+  check("no n8n notification before payment", !hooks.some((h) => h.body.phone === "+491767000001"));
+  const st1 = await fetch(`${BASE}/api/checkout/status?session_id=${s1.id}`).then((r) => r.json());
+  check("status before paying: unpaid", st1.state === "unpaid");
+  paySession(s1.id);
+  const st2 = await fetch(`${BASE}/api/checkout/status?session_id=${s1.id}`).then((r) => r.json());
+  const [r1b] = await sql`select status, payment_status, amount_cents from registrations where id = ${r1.id}`;
+  check("after paying: confirmed, paid 40 €", st2.state === "paid" && st2.registration.paidCents === 4000 && r1b.status === "confirmed" && r1b.payment_status === "paid");
+  await sleep(800);
+  const paidHook = hooks.find((h) => h.body.phone === "+491767000001");
+  check("n8n notified once paid (paid: true, 40 €)", paidHook?.body.paid === true && paidHook?.body.amount_paid_eur === 40, JSON.stringify(paidHook?.body));
+
+  // Stripe webhook path
+  const key2 = crypto.randomUUID();
+  await register({ guestCount: 1, phone: "0176 7000003", idempotencyKey: key2, ticketType: "vip" });
+  const [r2] = await sql`select * from registrations where idempotency_key = ${key2}`;
+  check("VIP checkout amount 30 €", sessions.get(r2.stripe_session_id)?.amount_total === 3000);
+  check("webhook with wrong signature rejected", (await stripeEvent("checkout.session.completed", paySession(r2.stripe_session_id), "whsec_wrong")).status === 400);
+  const wh = await stripeEvent("checkout.session.completed", sessions.get(r2.stripe_session_id));
+  const [r2b] = await sql`select status, payment_status from registrations where id = ${r2.id}`;
+  check("signed webhook confirms the payment", wh.status === 200 && r2b.status === "confirmed" && r2b.payment_status === "paid");
+  check("webhook repeated → no change, no error", (await stripeEvent("checkout.session.completed", sessions.get(r2.stripe_session_id))).status === 200);
+
+  // Cancel on Stripe → hold released
+  await reset({ max_capacity: 4, payments_enabled: true, price_normal_cents: 2000 });
+  const key3 = crypto.randomUUID();
+  await register({ guestCount: 4, phone: "0176 7000004", idempotencyKey: key3 });
+  check("event held full while paying", (await register({ guestCount: 1, phone: "0176 7000005" })).data.error === "full");
+  await fetch(BASE + "/api/checkout/cancel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idempotencyKey: key3 }) });
+  const [r3] = await sql`select status, payment_status, stripe_session_id from registrations where idempotency_key = ${key3}`;
+  check("guest pressed back: hold released, Stripe page closed", r3.status === "cancelled" && r3.payment_status === "expired" && sessions.get(r3.stripe_session_id)?.status === "expired");
+  check("places free again", (await register({ guestCount: 4, phone: "0176 7000006" })).status === 200);
+
+  // Hold runs out
+  await sql`update registrations set hold_expires_at = now() - interval '1 minute' where status = 'pending_payment'`;
+  const after = await register({ guestCount: 4, phone: "0176 7000007" });
+  check("expired hold is released automatically", after.status === 200 && (await sql`select count(*)::int as n from registrations where payment_status = 'expired' and phone = '+491767000006'`)[0].n === 1);
+
+  // Late payment after the hold ended is still honoured
+  const [late] = await sql`select id, stripe_session_id from registrations where phone = '+491767000006'`;
+  await stripeEvent("checkout.session.completed", paySession(late.stripe_session_id));
+  const [lateRow] = await sql`select status, payment_status, admin_note from registrations where id = ${late.id}`;
+  check("late payment honoured and flagged for the organizer", lateRow.status === "confirmed" && lateRow.payment_status === "paid" && lateRow.admin_note.includes("check capacity"));
+
+  // Expired webhook
+  await reset({ max_capacity: 10, payments_enabled: true, price_normal_cents: 2000 });
+  const key4 = crypto.randomUUID();
+  await register({ guestCount: 2, phone: "0176 7000008", idempotencyKey: key4 });
+  const [r4] = await sql`select * from registrations where idempotency_key = ${key4}`;
+  await stripeEvent("checkout.session.expired", { ...sessions.get(r4.stripe_session_id), status: "expired" });
+  check("Stripe 'expired' event cancels the hold", (await sql`select status from registrations where id = ${r4.id}`)[0].status === "cancelled");
+
+  // Same phone tries again while an earlier payment is open
+  const key5 = crypto.randomUUID();
+  await register({ guestCount: 2, phone: "0176 7000009", idempotencyKey: key5 });
+  const [r5] = await sql`select * from registrations where idempotency_key = ${key5}`;
+  const retry = await register({ guestCount: 3, phone: "0176 7000009" });
+  await sleep(500);
+  check("same guest retries: earlier unpaid attempt replaced, its Stripe page closed", retry.status === 200 && (await sql`select status from registrations where id = ${r5.id}`)[0].status === "cancelled" && sessions.get(r5.stripe_session_id)?.status === "expired");
+
+  // Waiting list never pays; Stripe outage handled
+  await reset({ max_capacity: 1, payments_enabled: true, price_normal_cents: 2000, waitlist_enabled: true });
+  await register({ guestCount: 1, phone: "0176 7000010" });
+  const wlPay = await register({ guestCount: 2, phone: "0176 7000011", acceptWaitlist: true });
+  check("waiting list: no payment", wlPay.status === 201 && wlPay.data.registration?.status === "waitlisted" && !wlPay.data.payment);
+  await reset({ max_capacity: 10, payments_enabled: true, price_normal_cents: 2000 });
+  stripeDown = true;
+  const down = await register({ guestCount: 2, phone: "0176 7000012" });
+  stripeDown = false;
+  check("Stripe unavailable → clear error, places not kept", down.status === 503 && down.data.error === "payment_unavailable" && (await sql`select status from registrations where phone = '+491767000012'`)[0]?.status === "cancelled");
+  await reset({ payments_enabled: false });
+  check("payment switched off → free reservation as before", (await register({ guestCount: 2 })).status === 201);
+
   console.log("Age notice");
   await sql`update event_settings set min_age = 18 where id = 1`;
   check("18+ notice shown (German default)", (await fetch(BASE + "/").then((r) => r.text())).includes("Einlass ab 18 Jahren"));
@@ -242,6 +372,7 @@ try {
             event_date = current_date + 21 where id = 1`;
   await sql.end();
   mock.close();
+  stripeMock.close();
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exitCode = failed ? 1 : 0;
 }

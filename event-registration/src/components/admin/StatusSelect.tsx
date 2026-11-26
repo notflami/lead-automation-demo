@@ -3,13 +3,14 @@
 import { useState, useTransition } from "react";
 import { setStatusAction } from "@/app/admin/actions";
 import { STATUSES, type RegistrationStatus } from "@/lib/types";
-import { STATUS_LABEL } from "./StatusBadge";
+import { STATUS_LABEL, StatusBadge } from "./StatusBadge";
 
 /** Inline status change in the table, e.g. checking guests in at the door. */
 export function StatusSelect({ id, status, label }: { id: string; status: RegistrationStatus; label: string }) {
   const [value, setValue] = useState(status);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  if (status === "pending_payment") return <StatusBadge status={status} />; // set only by the payment flow
   return (
     <span className="inline-flex flex-col">
       <select
@@ -18,7 +19,7 @@ export function StatusSelect({ id, status, label }: { id: string; status: Regist
         disabled={pending}
         onChange={(e) => {
           const next = e.target.value as RegistrationStatus;
-          if (next === "cancelled" && !window.confirm(`Cancel the registration of ${label}? Their places become free.`)) return;
+          if (next === "cancelled" && !window.confirm(`Cancel the registration of ${label}? Their places become free. If it was paid online, refund it in your Stripe dashboard.`)) return;
           const prev = value;
           setValue(next);
           setError(null);

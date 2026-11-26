@@ -1,31 +1,45 @@
 import "server-only";
 import { db } from "./db";
 import { decideCapacity } from "./capacity";
+import { HOLD_MINUTES } from "./stripe";
 import type { CapacityStats, Registration, RegistrationStatus } from "./types";
 import type { RegistrationInput } from "./validation";
 
 import type { Sql, TransactionSql } from "postgres";
 
 export type CreateResult =
-  | { ok: true; registration: Registration; duplicate: boolean }
+  | { ok: true; registration: Registration; duplicate: boolean; replacedSessions: string[] }
   | { ok: false; reason: "closed" | "full" | "not_enough" | "vip_full" | "vip_not_enough"; remaining: number; waitlistAvailable: boolean }
   | { ok: false; reason: "phone_taken" };
 
 const REG_COLUMNS = `id, reference, full_name, phone, email, guest_count, ticket_type, status, locale, admin_note,
   created_at, updated_at, cancelled_at, anonymized_at, webhook_status, webhook_attempts,
-  webhook_last_error, webhook_sent_at`;
+  webhook_last_error, webhook_sent_at, payment_status, amount_cents, stripe_session_id, checkout_url,
+  hold_expires_at, paid_at`;
+
+/** Places taken: confirmed, checked in, and still-valid payment holds. */
+const SEATED = `(status in ('confirmed', 'checked_in') or (status = 'pending_payment' and hold_expires_at > now()))`;
+
+/** Ends payment holds whose time ran out (frees their places and the phone number). Call under the settings lock. */
+export async function releaseExpiredHolds(tx: Sql | TransactionSql): Promise<number> {
+  const rows = await tx`
+    update registrations set status = 'cancelled', payment_status = 'expired', cancelled_at = now(), updated_at = now()
+    where status = 'pending_payment' and hold_expires_at <= now()
+    returning id`;
+  return rows.count;
+}
 
 async function reservedPlaces(tx: Sql | TransactionSql, excludeId?: string): Promise<number> {
   return (await reservedSplit(tx, excludeId)).total;
 }
 
-/** Seated places in total and in VIP (confirmed + checked in). */
+/** Taken places in total and in VIP (confirmed, checked in, and places held for a payment in progress). */
 async function reservedSplit(tx: Sql | TransactionSql, excludeId?: string): Promise<{ total: number; vip: number }> {
   const [row] = await tx<{ total: number; vip: number }[]>`
     select coalesce(sum(guest_count), 0)::int as total,
            coalesce(sum(guest_count) filter (where ticket_type = 'vip'), 0)::int as vip
     from registrations
-    where status in ('confirmed', 'checked_in')
+    where ${tx.unsafe(SEATED)}
       ${excludeId ? tx`and id <> ${excludeId}` : tx``}`;
   return row;
 }
@@ -35,7 +49,10 @@ async function reservedSplit(tx: Sql | TransactionSql, excludeId?: string): Prom
  * The `for update` lock on the single event_settings row serialises concurrent
  * registrations, so the capacity check and the insert can never race (no overbooking).
  */
-export async function createRegistration(input: RegistrationInput): Promise<CreateResult> {
+export async function createRegistration(
+  input: RegistrationInput,
+  payment: { required: boolean; unitPriceCents: number } = { required: false, unitPriceCents: 0 },
+): Promise<CreateResult> {
   const sql = db();
   return sql.begin(async (tx) => {
     const [settings] = await tx<{ max_capacity: number; vip_capacity: number; registration_open: boolean; waitlist_enabled: boolean }[]>`
@@ -47,8 +64,16 @@ export async function createRegistration(input: RegistrationInput): Promise<Crea
       `select ${REG_COLUMNS} from registrations where idempotency_key = $1`,
       [input.idempotencyKey],
     );
-    if (existing[0]) return { ok: true, registration: existing[0], duplicate: true } as const;
+    if (existing[0]) return { ok: true, registration: existing[0], duplicate: true, replacedSessions: [] } as const;
 
+    await releaseExpiredHolds(tx);
+
+    // The same guest trying again before finishing an earlier payment replaces that unpaid attempt.
+    const replaced = await tx<{ stripe_session_id: string | null }[]>`
+      update registrations set status = 'cancelled', payment_status = 'expired', cancelled_at = now(), updated_at = now()
+      where phone = ${input.phone} and status = 'pending_payment' and anonymized_at is null
+      returning stripe_session_id`;
+    const replacedSessions = replaced.map((r) => r.stripe_session_id).filter((x): x is string => Boolean(x));
 
     const [phoneTaken] = await tx`
       select 1 from registrations
@@ -69,15 +94,32 @@ export async function createRegistration(input: RegistrationInput): Promise<Crea
     });
     if (!decision.ok) return decision;
 
+    // Paid ticket: hold the places until the payment is done (no payment for the waiting list).
+    const pay = payment.required && decision.status === "confirmed";
     const [registration] = await tx.unsafe<Registration[]>(
       // privacy_accepted_at = when the guest submitted the form with the privacy notice shown above the button.
       `insert into registrations
-         (full_name, phone, guest_count, ticket_type, status, locale, idempotency_key, privacy_accepted_at)
-       values ($1, $2, $3, $4, $5, $6, $7, now())
+         (full_name, phone, guest_count, ticket_type, status, locale, idempotency_key, privacy_accepted_at,
+          payment_status, amount_cents, hold_expires_at, webhook_status)
+       values ($1, $2, $3, $4, $5, $6, $7, now(), $8, $9,
+               case when $10::boolean then now() + make_interval(mins => $11::int) end, $12)
        returning ${REG_COLUMNS}`,
-      [input.fullName, input.phone, input.guestCount, input.ticketType, decision.status, input.locale, input.idempotencyKey],
+      [
+        input.fullName,
+        input.phone,
+        input.guestCount,
+        input.ticketType,
+        pay ? "pending_payment" : decision.status,
+        input.locale,
+        input.idempotencyKey,
+        pay ? "pending" : "none",
+        payment.unitPriceCents * input.guestCount,
+        pay,
+        HOLD_MINUTES,
+        pay ? "skipped" : "pending", // n8n is notified only once the payment arrives
+      ],
     );
-    return { ok: true, registration, duplicate: false } as const;
+    return { ok: true, registration, duplicate: false, replacedSessions } as const;
   });
 }
 
@@ -93,6 +135,11 @@ export async function getStats(): Promise<CapacityStats> {
         wl_places: number;
         cancelled: number;
         vip: number;
+        held: number;
+        paid_cents: number;
+        paid_regs: number;
+        pending_cents: number;
+        pending_regs: number;
       }[]
     >`
       select
@@ -102,7 +149,12 @@ export async function getStats(): Promise<CapacityStats> {
         count(*) filter (where status = 'waitlisted')::int                                         as wl_regs,
         coalesce(sum(guest_count) filter (where status = 'waitlisted'), 0)::int                     as wl_places,
         count(*) filter (where status = 'cancelled')::int                                          as cancelled,
-        coalesce(sum(guest_count) filter (where status in ('confirmed', 'checked_in') and ticket_type = 'vip'), 0)::int as vip
+        coalesce(sum(guest_count) filter (where status in ('confirmed', 'checked_in') and ticket_type = 'vip'), 0)::int as vip,
+        coalesce(sum(guest_count) filter (where status = 'pending_payment' and hold_expires_at > now()), 0)::int as held,
+        coalesce(sum(amount_cents) filter (where payment_status = 'paid'), 0)::int                  as paid_cents,
+        count(*) filter (where payment_status = 'paid')::int                                       as paid_regs,
+        coalesce(sum(amount_cents) filter (where status = 'pending_payment' and hold_expires_at > now()), 0)::int as pending_cents,
+        count(*) filter (where status = 'pending_payment' and hold_expires_at > now())::int        as pending_regs
       from registrations`,
     sql<{ max_capacity: number; vip_capacity: number }[]>`select max_capacity, vip_capacity from event_settings where id = 1`,
   ]);
@@ -114,7 +166,11 @@ export async function getStats(): Promise<CapacityStats> {
     waitlistedPlaces: row.wl_places,
     cancelledRegistrations: row.cancelled,
     maxCapacity: settings.max_capacity,
-    remaining: Math.max(0, settings.max_capacity - row.reserved),
+    remaining: Math.max(0, settings.max_capacity - row.reserved - row.held),
+    paidCents: row.paid_cents,
+    paidRegistrations: row.paid_regs,
+    pendingPaymentCents: row.pending_cents,
+    pendingPaymentRegistrations: row.pending_regs,
     vipReservedPlaces: row.vip,
     vipCapacity: settings.vip_capacity,
     averageGuests: row.registrations ? Math.round((row.reserved / row.registrations) * 10) / 10 : 0,
@@ -182,8 +238,11 @@ export async function updateRegistration(
       select status, guest_count, anonymized_at from registrations where id = ${id} for update`;
     if (!current) return { ok: false, error: "Registration not found." };
     if (current.anonymized_at) return { ok: false, error: "This registration was anonymised and can no longer be edited." };
+    if (patch.status === "pending_payment" && current.status !== "pending_payment") {
+      return { ok: false, error: '"Awaiting payment" is set only by the online payment. Choose another status.' };
+    }
 
-    const seated = patch.status === "confirmed" || patch.status === "checked_in";
+    const seated = patch.status === "confirmed" || patch.status === "checked_in" || patch.status === "pending_payment";
     if (seated) {
       const split = await reservedSplit(tx, id);
       if (patch.ticketType === "vip" && split.vip + patch.guestCount > settings.vip_capacity) {

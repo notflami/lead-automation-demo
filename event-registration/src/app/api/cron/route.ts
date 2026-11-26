@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { anonymizeRegistrations } from "@/lib/registrations";
 import { retryPendingWebhooks } from "@/lib/webhook";
+import { releaseHolds } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -20,8 +21,9 @@ export async function GET(req: NextRequest) {
   if (!secret || !safeEqual(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
+  const releasedHolds = await releaseHolds();
   const webhooks = await retryPendingWebhooks(50);
   const anonymised = await anonymizeRegistrations(false);
   await db()`delete from rate_limit_hits where created_at < now() - interval '1 day'`;
-  return NextResponse.json({ ok: true, webhooks, anonymised });
+  return NextResponse.json({ ok: true, webhooks, anonymised, releasedHolds });
 }
