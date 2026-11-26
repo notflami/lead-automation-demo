@@ -1,4 +1,6 @@
-export type RegistrationStatus = "confirmed" | "waitlisted" | "checked_in" | "cancelled";
+export type RegistrationStatus = "confirmed" | "waitlisted" | "checked_in" | "cancelled" | "pending_payment";
+export type PaymentStatus = "none" | "pending" | "paid" | "failed" | "expired" | "refunded";
+/** Statuses an organizer can set by hand ("pending_payment" is set only by the payment flow). */
 export const STATUSES: RegistrationStatus[] = ["confirmed", "waitlisted", "checked_in", "cancelled"];
 /** Statuses that occupy capacity. */
 export const SEATED: RegistrationStatus[] = ["confirmed", "checked_in"];
@@ -32,6 +34,8 @@ export interface EventSettings {
   vip_capacity: number;
   price_normal_cents: number;
   price_vip_cents: number;
+  payments_enabled: boolean;
+  terms_text: string;
   ticket_normal_info: string;
   ticket_vip_info: string;
   max_guests_per_registration: number;
@@ -70,6 +74,12 @@ export interface Registration {
   webhook_attempts: number;
   webhook_last_error: string | null;
   webhook_sent_at: Date | null;
+  payment_status: PaymentStatus;
+  amount_cents: number;
+  stripe_session_id: string | null;
+  checkout_url: string | null;
+  hold_expires_at: Date | null;
+  paid_at: Date | null;
 }
 
 export interface CapacityStats {
@@ -83,5 +93,9 @@ export interface CapacityStats {
   remaining: number;
   vipReservedPlaces: number;
   vipCapacity: number;
+  paidCents: number;
+  paidRegistrations: number;
+  pendingPaymentCents: number;
+  pendingPaymentRegistrations: number;
   averageGuests: number;
 }

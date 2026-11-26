@@ -4,6 +4,7 @@ import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { RegistrationForm, type FormMode } from "@/components/RegistrationForm";
 import { SiteFooter } from "@/components/SiteFooter";
 import { env } from "@/lib/env";
+import { stripeConfigured } from "@/lib/stripe";
 import { formatDayMonth, formatEventDate, formatTimeRange, splitLines } from "@/lib/format";
 import { issueFormToken } from "@/lib/form-token";
 import { getDict } from "@/lib/locale";
@@ -111,6 +112,7 @@ export default async function HomePage() {
                 formToken={formToken}
                 siteUrl={env.siteUrl()}
                 whatsappNumber={s.whatsapp_number}
+                payment={{ enabled: s.payments_enabled && stripeConfigured(), termsUrl: s.terms_text.trim() ? "/terms" : null }}
                 tickets={{
                   vipEnabled: s.vip_capacity > 0,
                   vipAvailable: places.vip,

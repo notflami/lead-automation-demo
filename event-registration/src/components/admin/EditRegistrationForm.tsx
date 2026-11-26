@@ -44,7 +44,7 @@ export function EditRegistrationForm(props: {
       <label>
         <span className="mb-1 block text-sm font-medium">Status</span>
         <select name="status" defaultValue={i.status} className={input}>
-          {STATUSES.map((s) => (
+          {(i.status === "pending_payment" ? [...STATUSES, "pending_payment" as const] : STATUSES).map((s) => (
             <option key={s} value={s}>
               {STATUS_LABEL[s]}
             </option>
@@ -65,7 +65,7 @@ export function EditRegistrationForm(props: {
           <span className="ml-auto">
             <ActionButton
               action={() => setStatusAction(props.id, "cancelled")}
-              confirm="Cancel this registration? Their places become free again."
+              confirm="Cancel this registration? Their places become free again. If it was paid online, refund it in your Stripe dashboard."
               className="border border-kilim/40 text-kilim-dark hover:bg-kilim/8"
             >
               Cancel registration

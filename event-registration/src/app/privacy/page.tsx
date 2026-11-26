@@ -48,6 +48,16 @@ export default async function PrivacyPage() {
             unserem Auftrag gemäß Art. 28 DSGVO.
           </p>
           {s.privacy_notes && <p className="whitespace-pre-line">{s.privacy_notes}</p>}
+          {s.payments_enabled && (
+            <>
+              <h2>Online-Zahlung</h2>
+              <p>
+                Wenn Sie online bezahlen, werden Sie zu Stripe weitergeleitet (Stripe Payments Europe, Ltd., Irland). Ihre Zahlungsdaten
+                gibt Stripe nicht an uns weiter; wir erhalten nur die Bestätigung der Zahlung und den Betrag. Rechtsgrundlage ist die
+                Vertragsabwicklung (Art. 6 Abs. 1 lit. b DSGVO). Es gilt zusätzlich die Datenschutzerklärung von Stripe.
+              </p>
+            </>
+          )}
           <h2>Cookies und externe Inhalte</h2>
           <p>
             Diese Website setzt keine Tracking- oder Werbe-Cookies. Es wird höchstens ein Cookie für die gewählte Sprache gespeichert. Schriftarten
@@ -92,6 +102,16 @@ export default async function PrivacyPage() {
             Art. 28 GDPR.
           </p>
           {s.privacy_notes && <p className="whitespace-pre-line">{s.privacy_notes}</p>}
+          {s.payments_enabled && (
+            <>
+              <h2>Online payment</h2>
+              <p>
+                If you pay online, you are taken to Stripe (Stripe Payments Europe, Ltd., Ireland). Stripe does not share your payment
+                details with us; we only receive the confirmation and the amount. Legal basis: performance of the contract
+                (Art. 6(1)(b) GDPR). Stripe&apos;s own privacy policy also applies.
+              </p>
+            </>
+          )}
           <h2>Cookies and external content</h2>
           <p>
             This website uses no tracking or advertising cookies. At most, one cookie remembers your language. Fonts are served from our own

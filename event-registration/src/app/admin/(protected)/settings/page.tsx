@@ -3,6 +3,7 @@ import { SettingsForm } from "@/components/admin/SettingsForm";
 import { requireAdmin } from "@/lib/auth";
 import { getStats } from "@/lib/registrations";
 import { getSettings } from "@/lib/settings";
+import { stripeMode } from "@/lib/stripe";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="display text-3xl text-ink">Event settings</h1>
-      <SettingsForm initial={values} reservedPlaces={stats.reservedPlaces} />
+      <SettingsForm initial={values} reservedPlaces={stats.reservedPlaces} stripeMode={stripeMode()} />
       <section className="rounded-xl border border-kilim/25 bg-white p-5">
         <h2 className="font-semibold text-ink">Delete personal data</h2>
         <p className="mt-1 max-w-2xl text-thread">

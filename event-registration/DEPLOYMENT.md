@@ -185,6 +185,50 @@ share the link.
 
 ---
 
+## Part 4b: Online payment with Stripe (optional)
+
+Guests pay on Stripe's secure page. While they pay, their places are held for 35 minutes. The reservation
+is confirmed (and Telegram notified) only when the payment arrives; unpaid holds are released
+automatically. No monthly fee; Stripe charges per payment.
+
+**Before you start**
+- The **business name** on the Stripe account is what guests see on the payment page and their bank
+  statement. Check it: Stripe → **Settings → Business → Public details**.
+- Selling tickets is commercial use. Vercel's free plan is for non-commercial use: consider Vercel Pro
+  or running the site on your own server (Docker setup included).
+- Add your **terms and conditions (AGB)** in Event settings (see below) and have them checked.
+
+**1. Test mode first** (Stripe shows "Sandbox" / "Test mode" at the top)
+1. Stripe → **Developers → API keys** → copy the **Secret key** (`sk_test_…`).
+   In Vercel add the setting `STRIPE_SECRET_KEY` with this value.
+2. Stripe → **Developers → Webhooks** → **Add endpoint** (or "Add destination" → Webhook endpoint):
+   - **Endpoint URL:** `https://balkan-night-zwickau.vercel.app/api/stripe/webhook` (your address + `/api/stripe/webhook`)
+   - **Events:** `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+     `checkout.session.async_payment_failed`, `checkout.session.expired`
+   - Save, then click **Reveal** next to **Signing secret** (`whsec_…`).
+     In Vercel add the setting `STRIPE_WEBHOOK_SECRET` with this value.
+3. Vercel → **Deployments → ⋯ → Redeploy**.
+4. Stripe → **Settings → Payments → Payment methods**: keep **Cards, Apple Pay, Google Pay** on (PayPal and
+   Klarna are fine too). Turn **off** slow methods such as **SEPA Direct Debit**: they take days to confirm.
+5. Dashboard → **Event settings → Online payment**: it should say "Stripe is connected (TEST mode)".
+   Switch on **Take payment online**, paste your **AGB** text, **Save settings**.
+6. Test on your phone: reserve 2 places → you go to Stripe → pay with the test card
+   **4242 4242 4242 4242**, any future date, any CVC → you come back to "Bezahlt 40 €".
+   The dashboard shows "Paid online", and Stripe → **Payments** shows the test payment.
+   Also try pressing **back** on the Stripe page: the site says the payment was cancelled.
+
+**2. Go live (real money)**
+1. Stripe → **Activate account / Switch to live account**: business details, ID, bank account.
+2. In **live mode**, repeat steps 1.1 and 1.2: the live secret key (`sk_live_…`) and a **new** webhook
+   endpoint with the same URL and events (live mode has its own webhooks and signing secret).
+3. In Vercel replace `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` with the live values → **Redeploy**.
+4. Dashboard → Event settings should now say "LIVE mode". Make one real purchase yourself and refund it.
+
+**Refunds:** Stripe → **Payments** → open the payment → **Refund**. Then set the reservation to
+**Cancelled** in the dashboard so the places become free.
+
+---
+
 ## Part 5: Final test before sharing (10 minutes)
 
 On your **phone**, using mobile data (not Wi-Fi):
@@ -260,6 +304,8 @@ mechanisms to what they state. Remove services you don't use.
 | `CRON_SECRET` | **Mandatory for production** | Website works, but personal data is **not** deleted automatically after the event (GDPR) and failed n8n deliveries are only retried by hand. The dashboard shows a red warning. |
 | `N8N_WEBHOOK_URL` | Needed for n8n | No n8n notifications. Registrations are still saved and visible in the dashboard. |
 | `N8N_WEBHOOK_SECRET` | Needed when `N8N_WEBHOOK_URL` is set | n8n rejects every delivery (if its webhook checks the secret), or the webhook is unprotected. The dashboard shows a red warning. |
+| `STRIPE_SECRET_KEY` | For online payment | Without it, reservations stay free (no payment), even if "Take payment online" is switched on. |
+| `STRIPE_WEBHOOK_SECRET` | With `STRIPE_SECRET_KEY` | Payments are still confirmed when the guest returns to the site, but not if they close the browser on Stripe's page. |
 | `PUBLIC_SITE_URL` | Optional | Only needed with your own domain (e.g. `https://balkan-night.de`). Without it the vercel.app address is used for share links and the calendar file. |
 | `DEFAULT_PHONE_COUNTRY_CODE` | Optional (default `49`) | Numbers typed without country code (`0176…`) are treated as German. |
 | `EVENT_TIMEZONE` | Optional (default `Europe/Berlin`) | Time zone for dashboard dates and the calendar file. |

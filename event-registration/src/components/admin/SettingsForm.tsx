@@ -41,7 +41,15 @@ function Toggle(props: { name: string; label: string; hint: string; defaultCheck
   );
 }
 
-export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; reservedPlaces: number }) {
+export function SettingsForm({
+  initial: v,
+  reservedPlaces,
+  stripeMode,
+}: {
+  initial: Values;
+  reservedPlaces: number;
+  stripeMode: "test" | "live" | null;
+}) {
   const [state, action, pending] = useActionState(saveSettingsAction, null);
   return (
     <form
@@ -86,6 +94,22 @@ export function SettingsForm({ initial: v, reservedPlaces }: { initial: Values; 
         </Field>
         <Field label="Show “only X places left” below" hint="0 never shows it.">
           <input name="low_capacity_threshold" type="number" min={0} defaultValue={v.low_capacity_threshold} required className={input} />
+        </Field>
+      </Group>
+
+      <Group title="Online payment" description="Guests pay on Stripe's secure page; a reservation is confirmed only when the payment arrives.">
+        <Toggle
+          name="payments_enabled"
+          label="Take payment online (Stripe)"
+          hint={
+            stripeMode
+              ? `Stripe is connected (${stripeMode === "test" ? "TEST mode: no real money" : "LIVE mode: real payments"}).`
+              : "Stripe is not connected yet: add STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in Vercel. Until then reservations stay free."
+          }
+          defaultChecked={v.payments_enabled}
+        />
+        <Field label="Terms and conditions (AGB)" hint="Shown on the page /terms and linked next to the payment button. Have them checked by an adviser." wide>
+          <textarea name="terms_text" defaultValue={v.terms_text} rows={6} maxLength={20000} className={`${input} min-h-36`} />
         </Field>
       </Group>
 

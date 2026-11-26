@@ -7,7 +7,7 @@ import type { Registration } from "./types";
 export const MAX_WEBHOOK_ATTEMPTS = 10;
 
 export function buildPayload(
-  r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "ticket_type" | "status" | "locale" | "created_at">,
+  r: Pick<Registration, "reference" | "full_name" | "phone" | "guest_count" | "ticket_type" | "status" | "locale" | "created_at"> & Partial<Pick<Registration, "payment_status" | "amount_cents">>,
   eventName: string,
   prices: { normal: number; vip: number } = { normal: 0, vip: 0 },
 ) {
@@ -18,7 +18,9 @@ export function buildPayload(
     phone: r.phone,
     guest_count: r.guest_count,
     ticket_type: r.ticket_type, // "normal" | "vip"
-    amount_eur: (r.guest_count * (r.ticket_type === "vip" ? prices.vip : prices.normal)) / 100, // ticket value, not yet paid
+    amount_eur: (r.guest_count * (r.ticket_type === "vip" ? prices.vip : prices.normal)) / 100, // ticket value
+    paid: r.payment_status === "paid",
+    amount_paid_eur: r.payment_status === "paid" ? (r.amount_cents ?? 0) / 100 : 0,
     status: r.status, // "confirmed" | "waitlisted"
     language: r.locale,
     event_name: eventName,

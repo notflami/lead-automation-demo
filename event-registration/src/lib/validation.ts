@@ -80,7 +80,7 @@ export const adminRegistrationSchema = z.object({
   phone: z.string().trim().min(4).max(40),
   email: z.union([z.literal(""), z.string().trim().toLowerCase().email().max(254)]),
   guestCount: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),
-  status: z.enum(STATUSES as [string, ...string[]]),
+  status: z.enum(["confirmed", "waitlisted", "checked_in", "cancelled", "pending_payment"]),
   ticketType: z.enum(["normal", "vip"]),
   adminNote: z.string().max(2000),
 });
@@ -105,6 +105,8 @@ export const settingsSchema = z.object({
   vip_capacity: z.coerce.number().int().min(0).max(100000),
   price_normal_cents: z.coerce.number().int().min(0).max(1000000),
   price_vip_cents: z.coerce.number().int().min(0).max(1000000),
+  payments_enabled: z.boolean(),
+  terms_text: optionalText(20000),
   ticket_normal_info: optionalText(200),
   ticket_vip_info: optionalText(200),
   max_guests_per_registration: z.coerce.number().int().min(1).max(MAX_GUESTS_HARD_LIMIT),
