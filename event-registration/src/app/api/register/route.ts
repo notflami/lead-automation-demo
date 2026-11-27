@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     if (token === "invalid") return json({ ok: false, error: "form_expired", formToken: await issueFormToken() }, 401);
     if (token === "too_fast") return json({ ok: false, error: "too_fast", retryAfterMs: MIN_FILL_SECONDS * 1000 }, 425);
 
-    if (!(await rateLimit("register", clientIp(req.headers), 100, 10 * 60))) {
+    if (!(await rateLimit("register", clientIp(req.headers), 30, 10 * 60))) {
       return json({ ok: false, error: "rate_limited" }, 429);
     }
 

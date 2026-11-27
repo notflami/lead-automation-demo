@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Countdown to the start of online sales. Reloads the page when it reaches zero, so the form appears. */
 export function Countdown({ target, serverNow, units }: { target: string; serverNow: number; units: string[] }) {
@@ -8,18 +8,12 @@ export function Countdown({ target, serverNow, units }: { target: string; server
   // Correct for a phone whose clock is wrong: count from the server's time.
   const [offset] = useState(() => serverNow - Date.now());
   const [now, setNow] = useState(serverNow);
-  const reloading = useRef(false);
 
   useEffect(() => {
     const tick = () => {
       const t = Date.now() + offset;
       setNow(t);
-      if (t >= end && !reloading.current) {
-        // Everyone's countdown ends in the same second: spread the reloads over 0–3 s,
-        // so the website and database don't get all visitors at once.
-        reloading.current = true;
-        setTimeout(() => window.location.reload(), Math.random() * 3000);
-      }
+      if (t >= end) window.location.reload();
     };
     tick();
     const id = setInterval(tick, 1000);
