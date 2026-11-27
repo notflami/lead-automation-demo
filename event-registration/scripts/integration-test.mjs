@@ -179,8 +179,8 @@ try {
   check("forged form token → 401 with fresh token", forged.status === 401 && typeof forged.data.formToken === "string");
   await reset({ max_capacity: 1000 });
   const rl = [];
-  for (let i = 0; i < 32; i++) rl.push((await register({}, { ip: "203.0.113.7" })).status);
-  check("rate limit after 30 attempts per IP", rl.slice(0, 30).every((s) => s === 201) && rl.slice(30).every((s) => s === 429), rl.join(","));
+  for (let i = 0; i < 102; i++) rl.push((await register({ guestCount: 1 }, { ip: "203.0.113.7" })).status);
+  check("rate limit after 100 attempts per IP (shared mobile/Wi-Fi addresses)", rl.slice(0, 100).every((s) => s === 201) && rl.slice(100).every((s) => s === 429), rl.join(","));
 
   console.log("n8n webhook");
   await reset();
